@@ -12,7 +12,7 @@ fn main() -> std::io::Result<()> {
 	let paths = if args.len() > 1 {
 		args[1..].to_vec()
 	} else {
-		vec!["/usr/local/share/games/fortune/ivespoken.dat".to_string()]
+		vec!["/usr/local/share/games/fortunes/ivespoken.ivs".to_string()]
 	};
 
 	let paths: Vec<String> = paths.iter().map(|path| utils::add_dat_extension_if_needed(path.clone())).collect();
