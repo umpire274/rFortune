@@ -15,6 +15,10 @@ USAGE:
 FLAGS:
     -h, --help       Prints help information
     -v, --version    Prints the app version
+
+FILES:
+    the file have the same logic as 'fortune' file, a text file with a list of any kind \
+    of joke you want separated by % character, but it must have an '.ivs' extension.
 ";
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
