@@ -66,13 +66,3 @@ jobs:
               --output rfortune-${{ matrix.target }}.${{ matrix.ext }}.sig \
               --detach-sign target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }}
         shell: bash
-      
-      - name: Upload binaries and signatures
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }}
-            rfortune-${{ matrix.target }}.${{ matrix.ext }}.sig
-            rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
