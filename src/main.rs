@@ -73,7 +73,7 @@ fn main() {
     match load_fortunes(&filepath) {
         Ok(fortunes) => {
             if let Some(f) = get_random_fortune(&fortunes) {
-                println!("{}", f);
+                println!("{f}");
             } else {
                 eprintln!("No fortune could be selected.");
             }
