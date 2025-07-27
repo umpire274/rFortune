@@ -1,8 +1,8 @@
 name: Release Binaries
 
 on:
-  release:
-    types: [ published ]
+  push:
+    branches: [ main ]
 
 jobs:
   build:
@@ -45,8 +45,7 @@ jobs:
       
       - name: Generate SHA256 checksums
         run: |
-          cd release
-          sha256sum rfortune-${{ github.ref_name }}.zip > rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
+          sha256sum target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }} > rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
       
       - name: Import GPG key
         run: |
@@ -61,14 +60,14 @@ jobs:
         run: |
           gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
               --output rfortune-${{ matrix.target }}.${{ matrix.ext }}.sig \
-              --detach-sign rfortune-${{ matrix.target }}.${{ matrix.ext }}
+              --detach-sign target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }}
         shell: bash
       
       - name: Upload binaries and signatures
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            rfortune-${{ matrix.target }}.${{ matrix.ext }}
+            target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }}
             rfortune-${{ matrix.target }}.${{ matrix.ext }}.sig
             rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
         env:
