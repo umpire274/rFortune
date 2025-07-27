@@ -1,92 +1,83 @@
-mod utils;
+mod fortune;
+mod loader;
 
-use rand::seq::SliceRandom;
-use rand::thread_rng;
-use std::collections::HashSet;
+use clap::{Arg, Command};
+use fortune::get_random_fortune;
+use loader::load_fortunes;
 use std::env;
-use std::path::Path;
-
-const HELP: &str = "\
-Alternative implementation of the 'fortune' FreeBSD game written in Rust
-
-USAGE:
-    ivespoken [FLAGS] [file/directory]
-
-FLAGS:
-    -h, --help       Prints help information
-    -v, --version    Prints the app version
-
-FILES:
-    the file have the same logic as 'fortune' file, a text file with a list of any kind \
-    of joke you want separated by % character, but it must have an '.ivs' extension.
-";
+use std::fs::{create_dir_all, File};
+use std::io::Write;
+use std::path::PathBuf;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn main() -> std::io::Result<()> {
-    let paths = handle_args()?;
-
-    let paths: Vec<String> = paths
-        .iter()
-        .map(|path| utils::add_dat_extension_if_needed(path.clone()))
-        .collect();
-
-    let mut all_files = Vec::new();
-
-    for path in paths {
-        let path = Path::new(&path);
-        match utils::collect_files(path) {
-            Ok(mut files) => all_files.append(&mut files),
-            Err(-1) => eprintln!(
-                "Errore: Il percorso '{}' non esiste o non è accessibile.",
-                path.display()
-            ),
-            Err(_) => eprintln!("Errore sconosciuto nel percorso '{}'", path.display()),
+fn get_default_path() -> PathBuf {
+    if cfg!(target_os = "windows") {
+        if let Some(home_dir) = dirs::data_dir() {
+            return home_dir.join("rfortune").join("rfortunes.dat");
         }
-    }
-
-    if all_files.is_empty() {
-        eprintln!("Nessun file trovato.");
-        return Ok(());
-    }
-
-    let fortunes = utils::read_fortunes_from_files(&all_files)?;
-
-    let unique_fortunes: Vec<String> = fortunes
-        .into_iter()
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-
-    let mut rng = thread_rng();
-    if let Some(fortune) = unique_fortunes.choose(&mut rng) {
-        println!("{}", fortune);
+        PathBuf::from("C:\\Users\\Public\\rfortune\\rfortunes.dat")
     } else {
-        eprintln!("Nessuna frase disponibile.");
+        PathBuf::from("/usr/local/share/rfortune/rfortunes.dat")
+    }
+}
+
+fn init_default_file() -> Result<(), String> {
+    let path = get_default_path();
+    if let Some(parent) = path.parent() {
+        create_dir_all(parent).map_err(|e| format!("Failed to create directory: {e}"))?;
     }
 
+    let mut file = File::create(&path).map_err(|e| format!("Failed to create file: {e}"))?;
+    let sample = "%\nThe best way to get a good idea is to get a lot of ideas.\n%\nDo or do not. There is no try.\n%\nTo iterate is human, to recurse divine.\n%\n";
+    file.write_all(sample.as_bytes())
+        .map_err(|e| format!("Failed to write to file: {e}"))?;
+
+    println!("Initialized default fortune file at: {}", path.display());
     Ok(())
 }
 
-/// Gestisce gli argomenti della riga di comando
-fn handle_args() -> Result<Vec<String>, std::io::Error> {
-    let args: Vec<String> = env::args().collect();
+fn main() {
+    let matches = Command::new("rFortune")
+        .version(VERSION)
+        .author("Alessandro Maestri <your@email.com>")
+        .about("A Rust-based clone of the classic 'fortune' tool")
+        .arg(
+            Arg::new("file")
+                .short('f')
+                .long("file")
+                .value_name("FILE")
+                .help("Path to the .dat fortune file")
+                .num_args(1),
+        )
+        .arg(
+            Arg::new("init")
+                .long("init")
+                .help("Initialize default fortune file and directory")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .get_matches();
 
-    if args.len() > 1 {
-        match args[1].as_str() {
-            "-h" | "--help" => {
-                println!("{}", HELP);
-                std::process::exit(0);
-            }
-            "-v" | "--version" => {
-                println!("Version: {}", VERSION);
-                std::process::exit(0);
-            }
-            _ => Ok(args[1..].to_vec()),
+    if matches.get_flag("init") {
+        if let Err(e) = init_default_file() {
+            eprintln!("Initialization error: {e}");
         }
-    } else {
-        Ok(vec![
-            "/usr/local/share/games/fortunes/ivespoken.ivs".to_string()
-        ])
+        return;
+    }
+
+    let filepath = matches
+        .get_one::<String>("file")
+        .map(PathBuf::from)
+        .unwrap_or_else(get_default_path);
+
+    match load_fortunes(&filepath) {
+        Ok(fortunes) => {
+            if let Some(f) = get_random_fortune(&fortunes) {
+                println!("{f}");
+            } else {
+                eprintln!("No fortune could be selected.");
+            }
+        }
+        Err(e) => eprintln!("Error: {e}"),
     }
 }
