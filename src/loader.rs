@@ -4,7 +4,7 @@ use std::path::Path;
 
 pub fn load_fortunes<P: AsRef<Path>>(filename: P) -> Result<Vec<String>, String> {
     let content =
-        read_to_string(filename.as_ref()).map_err(|e| format!("Failed to read file: {}", e))?;
+        read_to_string(filename.as_ref()).map_err(|e| format!("Failed to read file: {e}"))?;
 
     let fortunes: Vec<String> = content
         .split('%')

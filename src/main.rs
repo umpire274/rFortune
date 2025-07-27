@@ -25,13 +25,13 @@ fn get_default_path() -> PathBuf {
 fn init_default_file() -> Result<(), String> {
     let path = get_default_path();
     if let Some(parent) = path.parent() {
-        create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+        create_dir_all(parent).map_err(|e| format!("Failed to create directory: {e}"))?;
     }
 
-    let mut file = File::create(&path).map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = File::create(&path).map_err(|e| format!("Failed to create file: {e}"))?;
     let sample = "%\nThe best way to get a good idea is to get a lot of ideas.\n%\nDo or do not. There is no try.\n%\nTo iterate is human, to recurse divine.\n%\n";
     file.write_all(sample.as_bytes())
-        .map_err(|e| format!("Failed to write to file: {}", e))?;
+        .map_err(|e| format!("Failed to write to file: {e}"))?;
 
     println!("Initialized default fortune file at: {}", path.display());
     Ok(())
@@ -60,7 +60,7 @@ fn main() {
 
     if matches.get_flag("init") {
         if let Err(e) = init_default_file() {
-            eprintln!("Initialization error: {}", e);
+            eprintln!("Initialization error: {e}");
         }
         return;
     }
@@ -78,6 +78,6 @@ fn main() {
                 eprintln!("No fortune could be selected.");
             }
         }
-        Err(e) => eprintln!("Error: {}", e),
+        Err(e) => eprintln!("Error: {e}"),
     }
 }
