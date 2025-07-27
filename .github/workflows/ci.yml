@@ -59,7 +59,7 @@ jobs:
           $file = \"target\\${{ matrix.target }}\\release\\rfortune-${{ matrix.target }}.${{ matrix.ext }}\"
           $out  = \"rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256\"
           Get-FileHash -Algorithm SHA256 $file | ForEach-Object {
-            $_.Hash + \"  rfortune-${{ matrix.target }}.${{ matrix.ext }}\" | Out-File $out
+            "$($_.Hash)  rfortune-${{ matrix.target }}.${{ matrix.ext }}" | Out-File $out
           }
       
       - name: Import GPG key
