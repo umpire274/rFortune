@@ -45,7 +45,11 @@ jobs:
       
       - name: Generate SHA256 checksums
         run: |
-          sha256sum target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }} > rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }} > rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
+          else
+            shasum -a 256 target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }} > rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
+          fi
       
       - name: Import GPG key
         run: |
