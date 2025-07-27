@@ -1,0 +1,75 @@
+name: Release Binaries
+
+on:
+  release:
+    types: [ published ]
+
+jobs:
+  build:
+    name: Build binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            ext: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: zip
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+      
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+      
+      - name: Package binary with docs
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          mkdir -p rfortune-${{ matrix.target }}
+          cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
+          cp $GITHUB_WORKSPACE/README.md $GITHUB_WORKSPACE/CHANGELOG.md $GITHUB_WORKSPACE/LICENSE rfortune-${{ matrix.target }}/
+          tar -czvf rfortune-${{ matrix.target }}.${{ matrix.ext }} rfortune-${{ matrix.target }} 2>/dev/null || zip -r rfortune-${{ matrix.target }}.${{ matrix.ext }} rfortune-${{ matrix.target }}
+      
+      - name: Generate SHA256 checksums
+        run: |
+          cd release
+          sha256sum rfortune-${{ github.ref_name }}.zip > rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
+      
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --batch --import
+          echo "use-agent" >> ~/.gnupg/gpg.conf
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          echo RELOADAGENT | gpg-connect-agent
+        shell: bash
+      
+      - name: Sign binary
+        run: |
+          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+              --output rfortune-${{ matrix.target }}.${{ matrix.ext }}.sig \
+              --detach-sign rfortune-${{ matrix.target }}.${{ matrix.ext }}
+        shell: bash
+      
+      - name: Upload binaries and signatures
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            rfortune-${{ matrix.target }}.${{ matrix.ext }}
+            rfortune-${{ matrix.target }}.${{ matrix.ext }}.sig
+            rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
