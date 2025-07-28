@@ -30,6 +30,15 @@ jobs:
             gpg --verify $sig $file || exit 1
           done
 
+      - name: Verify Checksums
+        shell: bash
+        run: |
+          cd artifacts
+          for checksum in *.sha256; do
+            echo "Verifying $checksum..."
+            sha256sum -c $checksum || exit 1
+          done
+
       - name: Extract Version
         id: extract_version
         run: |
@@ -45,5 +54,10 @@ jobs:
           files: |
             artifacts/rfortune-*
             artifacts/*.sig
+            artifacts/*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup
+        if: always()
+        run: rm -rf artifacts/
