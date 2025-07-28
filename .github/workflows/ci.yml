@@ -139,5 +139,5 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release_artifacts-${{ matrix.target }}  # Nome unico per ogni target
+          name: release_artifacts
           path: release_artifacts/*

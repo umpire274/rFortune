@@ -17,7 +17,8 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: release_artifacts  # Directory di destinazione
+          name: release_artifacts
+          path: release_artifacts/*
           run-id: ${{ github.event.workflow_run.id }}
 
       - name: Verify Artifacts Structure
