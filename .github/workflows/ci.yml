@@ -49,12 +49,29 @@ jobs:
           cp $GITHUB_WORKSPACE/README.md $GITHUB_WORKSPACE/CHANGELOG.md $GITHUB_WORKSPACE/LICENSE rfortune-${{ matrix.target }}/
           
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            # Soluzione PowerShell affidabile con path assoluti
             pwsh -Command "
+              $$sourcePath = Join-Path -Path (Get-Location) -ChildPath 'rfortune-${{ matrix.target }}'
+              $$destPath = Join-Path -Path '$ARTIFACTS_DIR' -ChildPath 'rfortune-${{ matrix.target }}.zip'
+              
+              if (-not (Test-Path $$sourcePath)) {
+                Write-Error 'Source directory not found: $$sourcePath'
+                exit 1
+              }
+              
               Add-Type -AssemblyName System.IO.Compression.FileSystem
-              [System.IO.Compression.ZipFile]::CreateFromDirectory(
-                'rfortune-${{ matrix.target }}',
-                '$ARTIFACTS_DIR/rfortune-${{ matrix.target }}.zip'
-              )
+              try {
+                [System.IO.Compression.ZipFile]::CreateFromDirectory(
+                  $$sourcePath,
+                  $$destPath,
+                  [System.IO.Compression.CompressionLevel]::Optimal,
+                  $false
+                )
+                Write-Host 'Successfully created zip at $$destPath'
+              } catch {
+                Write-Error 'Failed to create zip: $$_'
+                exit 1
+              }
             "
           else
             tar -czvf "$ARTIFACTS_DIR/rfortune-${{ matrix.target }}.tar.gz" rfortune-${{ matrix.target }}
