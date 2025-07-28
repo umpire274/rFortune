@@ -79,3 +79,11 @@ jobs:
               --output rfortune-${{ matrix.target }}.${{ matrix.ext }}.sig \
               --detach-sign target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }}
         shell: bash
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rfortune-artifacts-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.*
+            rfortune-${{ matrix.target }}.*  # .sig, .sha256 generati fuori da target
