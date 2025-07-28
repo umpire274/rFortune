@@ -32,6 +32,6 @@ jobs:
           tag_name: v${{ steps.extract_version.outputs.version }}
           name: v${{ steps.extract_version.outputs.version }}
           body_path: CHANGELOG.md
-          files: artifacts/**/*
+          files: artifacts/rfortune-artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
