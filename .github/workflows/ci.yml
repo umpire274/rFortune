@@ -38,16 +38,11 @@ jobs:
       - name: Package Binary
         shell: bash
         run: |
-          mkdir -p release_artifacts
           cd target/${{ matrix.target }}/release
           mkdir -p rfortune-${{ matrix.target }}
           cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
           cp $GITHUB_WORKSPACE/README.md $GITHUB_WORKSPACE/CHANGELOG.md $GITHUB_WORKSPACE/LICENSE rfortune-${{ matrix.target }}/
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            zip -r ../../../../release_artifacts/rfortune-${{ matrix.target }}.zip rfortune-${{ matrix.target }}
-          else
-            tar -czvf ../../../../release_artifacts/rfortune-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
-          fi
+          tar -czvf rfortune-${{ matrix.target }}.${{ matrix.ext }} rfortune-${{ matrix.target }} 2>/dev/null || zip -r rfortune-${{ matrix.target }}.${{ matrix.ext }} rfortune-${{ matrix.target }}
 
       - name: Generate Checksum (Unix)
         if: matrix.os != 'windows-latest'
