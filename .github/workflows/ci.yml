@@ -35,39 +35,26 @@ jobs:
       - name: Build Release Binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Package Binary
+      - name: Package and Sign
         shell: bash
         run: |
-          mkdir -p release_artifacts
+          # Set global artifacts directory
+          export ARTIFACTS_DIR="$PWD/release_artifacts"
+          mkdir -p "$ARTIFACTS_DIR"
+          
+          # Build package
           cd target/${{ matrix.target }}/release
           mkdir -p rfortune-${{ matrix.target }}
           cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
           cp $GITHUB_WORKSPACE/README.md $GITHUB_WORKSPACE/CHANGELOG.md $GITHUB_WORKSPACE/LICENSE rfortune-${{ matrix.target }}/
-          tar -czvf rfortune-${{ matrix.target }}.${{ matrix.ext }} rfortune-${{ matrix.target }} 2>/dev/null || zip -r rfortune-${{ matrix.target }}.${{ matrix.ext }} rfortune-${{ matrix.target }}
-
-      - name: Generate Checksum (Unix)
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          cd release_artifacts
-          if command -v sha256sum >/dev/null; then
-            sha256sum rfortune-${{ matrix.target }}.* > rfortune-${{ matrix.target }}.sha256
+          
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            zip -r "$ARTIFACTS_DIR/rfortune-${{ matrix.target }}.zip" rfortune-${{ matrix.target }}
           else
-            shasum -a 256 rfortune-${{ matrix.target }}.* > rfortune-${{ matrix.target }}.sha256
+            tar -czvf "$ARTIFACTS_DIR/rfortune-${{ matrix.target }}.tar.gz" rfortune-${{ matrix.target }}
           fi
 
-      - name: Generate Checksum (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          cd release_artifacts
-          $file = "rfortune-${{ matrix.target }}.zip"
-          $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
-          "$hash *$file" | Out-File -Encoding utf8 "$file.sha256"
-
-      - name: Setup GPG
-        shell: bash
-        run: |
+          # Setup GPG (once for all operations)
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --batch --import
           echo "use-agent" >> ~/.gnupg/gpg.conf
           echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
@@ -75,27 +62,28 @@ jobs:
           gpgconf --kill gpg-agent
           gpgconf --launch gpg-agent
 
-      - name: Sign Artifacts (Unix)
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          cd release_artifacts
+          cd "$ARTIFACTS_DIR"
+          
+          # Generate checksums
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            # Windows checksum (PowerShell)
+            pwsh -Command "
+              \$file = 'rfortune-${{ matrix.target }}.zip'
+              \$hash = (Get-FileHash -Algorithm SHA256 \$file).Hash.ToLower()
+              '\$hash *\$file' | Out-File -Encoding utf8 '\$file.sha256'
+            "
+          else
+            # Unix checksum
+            sha256sum rfortune-${{ matrix.target }}.* > rfortune-${{ matrix.target }}.sha256 || 
+            shasum -a 256 rfortune-${{ matrix.target }}.* > rfortune-${{ matrix.target }}.sha256
+          fi
+          
+          # Sign artifacts (works for all platforms)
           for f in rfortune-${{ matrix.target }}.*; do
-            [[ "$f" == *.sig ]] && continue
+            [[ "$f" == *.sig || "$f" == *.sha256 ]] && continue
             gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
                 --output "$f.sig" --detach-sign "$f"
           done
-
-      - name: Sign Artifacts (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          cd release_artifacts
-          $passphrase = "${{ secrets.GPG_PASSPHRASE }}"
-          $files = Get-ChildItem -File | Where-Object { $_.Name -like "rfortune-${{ matrix.target }}.*" -and $_.Name -notlike "*.sig" }
-          foreach ($file in $files) {
-            gpg --batch --yes --passphrase "$passphrase" --output "$($file.Name).sig" --detach-sign $file.Name
-          }
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
