@@ -17,14 +17,20 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
-          pattern: release_artifacts-*
-          merge-multiple: true
+          name: release_artifacts  # Nome corrispondente a ci.yml
+          path: release_artifacts  # Directory di destinazione
+
+      - name: Verify Artifacts Structure
+        shell: bash
+        run: |
+          echo "Contenuto della directory release_artifacts:"
+          ls -la release_artifacts/
+          [ -f release_artifacts/rfortune-* ] || (echo "Nessun artifact trovato!" && exit 1)
 
       - name: Verify GPG Signatures
         shell: bash
         run: |
-          cd artifacts
+          cd release_artifacts
           for sig in *.sig; do
             file=${sig%.sig}
             echo "Verifying $file..."
@@ -34,7 +40,7 @@ jobs:
       - name: Verify Checksums
         shell: bash
         run: |
-          cd artifacts
+          cd release_artifacts
           for checksum in *.sha256; do
             echo "Verifying $checksum..."
             sha256sum -c $checksum || exit 1
@@ -53,12 +59,12 @@ jobs:
           name: "v${{ steps.extract_version.outputs.version }}"
           body_path: CHANGELOG.md
           files: |
-            artifacts/rfortune-*
-            artifacts/*.sig
-            artifacts/*.sha256
+            release_artifacts/rfortune-*
+            release_artifacts/*.sig
+            release_artifacts/*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup
         if: always()
-        run: rm -rf artifacts/
+        run: rm -rf release_artifacts/
