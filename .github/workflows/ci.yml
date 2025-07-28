@@ -82,7 +82,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: rfortune-artifacts
+          name: rfortune-artifacts-${{ matrix.target }}
           path: |
             target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }}
             rfortune-${{ matrix.target }}.${{ matrix.ext }}.sig
