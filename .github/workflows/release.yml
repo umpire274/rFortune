@@ -18,10 +18,9 @@ jobs:
       - name: Download all artifacts from build
         uses: actions/download-artifact@v4
         with:
-          name: rfortune-artifacts
           path: artifacts
           run-id: ${{ github.event.workflow_run.id }}
-
+      
       - name: <Debug>List downloaded artifacts</Debug>
         run: ls -R artifacts
 
@@ -37,6 +36,6 @@ jobs:
           tag_name: v${{ steps.extract_version.outputs.version }}
           name: v${{ steps.extract_version.outputs.version }}
           body_path: CHANGELOG.md
-          files: artifacts/rfortune-*
+          files: artifacts/**/rfortune-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
