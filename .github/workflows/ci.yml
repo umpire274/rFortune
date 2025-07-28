@@ -48,17 +48,44 @@ jobs:
           cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
           cp $GITHUB_WORKSPACE/README.md $GITHUB_WORKSPACE/CHANGELOG.md $GITHUB_WORKSPACE/LICENSE rfortune-${{ matrix.target }}/
 
-      - name: Compress with PowerShell on Windows
+      - name: Package Windows Binary
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Compress-Archive -Path "rfortune-${{ matrix.target }}" `
-                           -DestinationPath "$ARTIFACTS_DIR/rfortune-${{ matrix.target }}.zip"
+          # Converti il path stile Unix in path nativo Windows
+          $artifactsDir = "$pwd/release_artifacts"
+          New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
+          
+          $packageDir = "rfortune-${{ matrix.target }}"
+          $zipPath = "$artifactsDir/rfortune-${{ matrix.target }}.zip"
+          
+          # Verifica che la directory esista
+          if (-not (Test-Path $packageDir)) {
+            Write-Error "Directory $packageDir not found!"
+            exit 1
+          }
+          
+          # Crea l'archivio ZIP
+          try {
+            Compress-Archive -Path "$packageDir/*" -DestinationPath $zipPath -CompressionLevel Optimal
+            Write-Host "Successfully created $zipPath"
+          
+            # Verifica che il file ZIP sia stato creato
+            if (-not (Test-Path $zipPath)) {
+              throw "ZIP file not created!"
+            }
+          }
+          catch {
+            Write-Error "Failed to create ZIP: $_"
+            exit 1
+          }
 
       - name: Compress with tar on Unix
         if: matrix.os != 'windows-latest'
         shell: bash
         run: |
+          export ARTIFACTS_DIR="$PWD/release_artifacts"
+          
           tar -czvf $ARTIFACTS_DIR/rfortune-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
 
       - name: Checksum and Sign Package
@@ -72,6 +99,7 @@ jobs:
           gpgconf --kill gpg-agent
           gpgconf --launch gpg-agent
 
+          export ARTIFACTS_DIR="$PWD/release_artifacts"        
           cd "$ARTIFACTS_DIR"
           
           # Generate checksums
