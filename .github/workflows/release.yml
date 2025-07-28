@@ -15,6 +15,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: <Debug>List downloaded artifacts</Debug>
+        run: ls -R artifacts
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -32,6 +35,6 @@ jobs:
           tag_name: v${{ steps.extract_version.outputs.version }}
           name: v${{ steps.extract_version.outputs.version }}
           body_path: CHANGELOG.md
-          files: artifacts/rfortune-artifacts-*/rfortune-*
+          files: artifacts/**/rfortune-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
