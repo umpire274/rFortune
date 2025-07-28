@@ -1,12 +1,13 @@
-name: Release Binaries
+name: Build and Upload Artifacts
 
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
 
 jobs:
   build:
-    name: Build binaries
+    name: Build Binaries
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -25,65 +26,83 @@ jobs:
             ext: zip
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Rust target
+      - name: Install Rust Target
         run: rustup target add ${{ matrix.target }}
 
-      - name: Build release binary
+      - name: Build Release Binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Package binary with docs
+      - name: Package Binary
         shell: bash
         run: |
+          mkdir -p release_artifacts
           cd target/${{ matrix.target }}/release
           mkdir -p rfortune-${{ matrix.target }}
           cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
           cp $GITHUB_WORKSPACE/README.md $GITHUB_WORKSPACE/CHANGELOG.md $GITHUB_WORKSPACE/LICENSE rfortune-${{ matrix.target }}/
-          tar -czvf rfortune-${{ matrix.target }}.${{ matrix.ext }} rfortune-${{ matrix.target }} 2>/dev/null || zip -r rfortune-${{ matrix.target }}.${{ matrix.ext }} rfortune-${{ matrix.target }}
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            zip -r ../../../../release_artifacts/rfortune-${{ matrix.target }}.zip rfortune-${{ matrix.target }}
+          else
+            tar -czvf ../../../../release_artifacts/rfortune-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
+          fi
 
-      - name: Generate SHA256 checksums (Unix)
-        if: runner.os != 'Windows'
+      - name: Generate Checksum (Unix)
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
-          if command -v sha256sum >/dev/null 2>&1; then
-            sha256sum target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }} > rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
+          cd release_artifacts
+          if command -v sha256sum >/dev/null; then
+            sha256sum rfortune-${{ matrix.target }}.* > rfortune-${{ matrix.target }}.sha256
           else
-            shasum -a 256 target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }} > rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
+            shasum -a 256 rfortune-${{ matrix.target }}.* > rfortune-${{ matrix.target }}.sha256
           fi
-          
-      - name: Generate SHA256 checksums (Windows)
-        if: runner.os == 'Windows'
+
+      - name: Generate Checksum (Windows)
+        if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          $file = "target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }}"
-          $out  = "rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256"
-          Get-FileHash -Algorithm SHA256 $file | ForEach-Object {
-            "$($_.Hash)  rfortune-${{ matrix.target }}.${{ matrix.ext }}" | Out-File $out
-          }
+          cd release_artifacts
+          $file = "rfortune-${{ matrix.target }}.zip"
+          $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
+          "$hash *$file" | Out-File -Encoding utf8 "$file.sha256"
 
-      - name: Import GPG key
+      - name: Setup GPG
+        shell: bash
         run: |
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --batch --import
           echo "use-agent" >> ~/.gnupg/gpg.conf
           echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
           echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
-          echo RELOADAGENT | gpg-connect-agent
-        shell: bash
+          gpgconf --kill gpg-agent
+          gpgconf --launch gpg-agent
 
-      - name: Sign binary
+      - name: Sign Artifacts (Unix)
+        if: matrix.os != 'windows-latest'
+        shell: bash
         run: |
-          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
-              --output rfortune-${{ matrix.target }}.${{ matrix.ext }}.sig \
-              --detach-sign target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }}
-        shell: bash
+          cd release_artifacts
+          for f in rfortune-${{ matrix.target }}.*; do
+            [[ "$f" == *.sig ]] && continue
+            gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+                --output "$f.sig" --detach-sign "$f"
+          done
 
-      - name: Upload build artifacts
+      - name: Sign Artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          cd release_artifacts
+          $passphrase = "${{ secrets.GPG_PASSPHRASE }}"
+          $files = Get-ChildItem -File | Where-Object { $_.Name -like "rfortune-${{ matrix.target }}.*" -and $_.Name -notlike "*.sig" }
+          foreach ($file in $files) {
+            gpg --batch --yes --passphrase "$passphrase" --output "$($file.Name).sig" --detach-sign $file.Name
+          }
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: rfortune-artifacts-${{ matrix.target }}
-          path: |
-            target/${{ matrix.target }}/release/rfortune-${{ matrix.target }}.${{ matrix.ext }}
-            rfortune-${{ matrix.target }}.${{ matrix.ext }}.sig
-            rfortune-${{ matrix.target }}.${{ matrix.ext }}.sha256
+          name: release_artifacts
+          path: release_artifacts/*

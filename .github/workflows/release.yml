@@ -1,10 +1,9 @@
-name: Create GitHub Release
+name: Create Release
 
 on:
   workflow_run:
-    workflows: [ "Release Binaries" ]
-    types:
-      - completed
+    workflows: ["Build and Upload Artifacts"]
+    types: [completed]
 
 jobs:
   release:
@@ -12,30 +11,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download all artifacts from build
+      - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
+          name: release_artifacts
           path: artifacts
-          run-id: ${{ github.event.workflow_run.id }}
-      
-      - name: <Debug>List downloaded artifacts</Debug>
-        run: ls -R artifacts
 
-      - name: Extract version from Cargo.toml
+      - name: Verify GPG Signatures
+        shell: bash
+        run: |
+          cd artifacts
+          for sig in *.sig; do
+            file=${sig%.sig}
+            echo "Verifying $file..."
+            gpg --verify $sig $file || exit 1
+          done
+
+      - name: Extract Version
         id: extract_version
         run: |
           VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Upload release assets
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.extract_version.outputs.version }}
-          name: v${{ steps.extract_version.outputs.version }}
+          name: "v${{ steps.extract_version.outputs.version }}"
           body_path: CHANGELOG.md
-          files: artifacts/**/rfortune-*
+          files: |
+            artifacts/rfortune-*
+            artifacts/*.sig
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
