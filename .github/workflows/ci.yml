@@ -52,32 +52,25 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          # Converti il path stile Unix in path nativo Windows
-          $artifactsDir = "$pwd/release_artifacts"
-          New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
+          # Path assoluti per evitare problemi
+          $baseDir = $pwd
+          $artifactsDir = "$baseDir/release_artifacts"
+          $targetDir = "$baseDir/target/${{ matrix.target }}/release"
           
-          $packageDir = "rfortune-${{ matrix.target }}"
-          $zipPath = "$artifactsDir/rfortune-${{ matrix.target }}.zip"
+          # Lavora nella directory di build
+          Push-Location $targetDir
           
-          # Verifica che la directory esista
-          if (-not (Test-Path $packageDir)) {
-            Write-Error "Directory $packageDir not found!"
-            exit 1
-          }
-          
-          # Crea l'archivio ZIP
           try {
+            # Prepara la directory del pacchetto
+            $packageDir = "rfortune-${{ matrix.target }}"
+            $zipPath = "$artifactsDir/rfortune-${{ matrix.target }}.zip"
             Compress-Archive -Path "$packageDir/*" -DestinationPath $zipPath -CompressionLevel Optimal
-            Write-Host "Successfully created $zipPath"
           
-            # Verifica che il file ZIP sia stato creato
-            if (-not (Test-Path $zipPath)) {
-              throw "ZIP file not created!"
-            }
+            Write-Host "ZIP creato correttamente in $zipPath"
           }
-          catch {
-            Write-Error "Failed to create ZIP: $_"
-            exit 1
+          finally {
+            # Torna sempre alla directory originale
+            Pop-Location
           }
 
       - name: Compress with tar on Unix
@@ -85,7 +78,7 @@ jobs:
         shell: bash
         run: |
           export ARTIFACTS_DIR="$PWD/release_artifacts"
-          
+          cd target/${{ matrix.target }}/release
           tar -czvf $ARTIFACTS_DIR/rfortune-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
 
       - name: Checksum and Sign Package
