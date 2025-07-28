@@ -18,10 +18,11 @@ jobs:
       - name: <Debug>List downloaded artifacts</Debug>
         run: ls -R artifacts
 
-      - name: Download all artifacts
+      - name: Download all artifacts from build
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Extract version from Cargo.toml
         id: extract_version
