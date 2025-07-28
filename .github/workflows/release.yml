@@ -2,7 +2,7 @@ name: Create GitHub Release
 
 on:
   workflow_run:
-    workflows: ["Release Binaries"]
+    workflows: [ "Release Binaries" ]
     types:
       - completed
 
@@ -32,6 +32,6 @@ jobs:
           tag_name: v${{ steps.extract_version.outputs.version }}
           name: v${{ steps.extract_version.outputs.version }}
           body_path: CHANGELOG.md
-          files: artifacts/rfortune-artifacts/*
+          files: artifacts/rfortune-artifacts-*/rfortune-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
