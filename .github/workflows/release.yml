@@ -17,8 +17,9 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: release_artifacts
           path: artifacts
+          pattern: release_artifacts-*
+          merge-multiple: true
 
       - name: Verify GPG Signatures
         shell: bash

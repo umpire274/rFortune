@@ -85,8 +85,28 @@ jobs:
                 --output "$f.sig" --detach-sign "$f"
           done
 
+      - name: Clean Previous Artifacts
+        if: matrix.os == 'ubuntu-latest' && matrix.target == 'x86_64-unknown-linux-gnu'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+            for (const artifact of artifacts.artifacts) {
+              if (artifact.name.startsWith('release_artifacts')) {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+              }
+            }
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release_artifacts
+          name: release_artifacts-${{ matrix.target }}  # Nome unico per ogni target
           path: release_artifacts/*
