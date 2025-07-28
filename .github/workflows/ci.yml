@@ -38,6 +38,7 @@ jobs:
       - name: Package Binary
         shell: bash
         run: |
+          mkdir -p release_artifacts
           cd target/${{ matrix.target }}/release
           mkdir -p rfortune-${{ matrix.target }}
           cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
