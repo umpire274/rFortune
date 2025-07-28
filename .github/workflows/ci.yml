@@ -35,7 +35,7 @@ jobs:
       - name: Build Release Binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Package and Sign
+      - name: Build Package
         shell: bash
         run: |
           # Set global artifacts directory
@@ -47,36 +47,23 @@ jobs:
           mkdir -p rfortune-${{ matrix.target }}
           cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
           cp $GITHUB_WORKSPACE/README.md $GITHUB_WORKSPACE/CHANGELOG.md $GITHUB_WORKSPACE/LICENSE rfortune-${{ matrix.target }}/
-          
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            # Soluzione PowerShell affidabile con path assoluti
-            pwsh -Command "
-              $$sourcePath = Join-Path -Path (Get-Location) -ChildPath 'rfortune-${{ matrix.target }}'
-              $$destPath = Join-Path -Path '$ARTIFACTS_DIR' -ChildPath 'rfortune-${{ matrix.target }}.zip'
-              
-              if (-not (Test-Path $$sourcePath)) {
-                Write-Error 'Source directory not found: $$sourcePath'
-                exit 1
-              }
-              
-              Add-Type -AssemblyName System.IO.Compression.FileSystem
-              try {
-                [System.IO.Compression.ZipFile]::CreateFromDirectory(
-                  $$sourcePath,
-                  $$destPath,
-                  [System.IO.Compression.CompressionLevel]::Optimal,
-                  $false
-                )
-                Write-Host 'Successfully created zip at $$destPath'
-              } catch {
-                Write-Error 'Failed to create zip: $$_'
-                exit 1
-              }
-            "
-          else
-            tar -czvf "$ARTIFACTS_DIR/rfortune-${{ matrix.target }}.tar.gz" rfortune-${{ matrix.target }}
-          fi
 
+      - name: Compress with PowerShell on Windows
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "rfortune-${{ matrix.target }}" `
+                           -DestinationPath "$ARTIFACTS_DIR/rfortune-${{ matrix.target }}.zip"
+
+      - name: Compress with tar on Unix
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          tar -czvf $ARTIFACTS_DIR/rfortune-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
+
+      - name: Checksum and Sign Package
+        shell: bash
+        run: |
           # Setup GPG (once for all operations)
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --batch --import
           echo "use-agent" >> ~/.gnupg/gpg.conf
