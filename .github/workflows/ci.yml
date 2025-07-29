@@ -141,8 +141,9 @@ jobs:
           name: "v${{ steps.extract_version.outputs.version }}"
           body_path: CHANGELOG.md
           files: |
-            release_artifacts/rfortune-*
-            release_artifacts/*.sig
-            release_artifacts/*.sha256
+            release_artifacts/rfortune-*.tar.gz
+            release_artifacts/rfortune-*.zip
+            release_artifacts/rfortune-*.sig
+            release_artifacts/rfortune-*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
