@@ -154,8 +154,8 @@ jobs:
       - name: <Debug>Verifica upload effettivo</Debug>
         shell: bash
         run: |
-          echo "Contenuto della directory di lavoro dopo upload-artifact:"
-          find . -type f | grep release_artifacts || echo "Nessun file trovato"
+          echo "Contenuto della directory di lavoro"
+          ls -lah *
           
           echo -e "\nControllo cartelle Artifact note:"
           ls -R ${{ github.workspace }}/release_artifacts || echo "Cartella non trovata"
