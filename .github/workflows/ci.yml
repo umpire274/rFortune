@@ -108,6 +108,9 @@ jobs:
       - name: Consolidate all artifacts
         shell: bash
         run: |
+          echo "[DEBUG] list directory..."
+          ls -lah .
+          echo -e "\n"
           mkdir -p release_artifacts
           find temp_download -type f -exec cp {} release_artifacts/ \;
 
