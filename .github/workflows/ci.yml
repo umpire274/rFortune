@@ -1,13 +1,13 @@
-name: Build and Upload Artifacts
+name: Build, Package and Release
 
 on:
-  workflow_run:
-    workflows: ["Rust Build & Test"]
-    types: [completed]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    name: Build and Sign Binaries
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -24,26 +24,26 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: zip
-
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
-
+      
       - name: Build binary
         run: cargo build --release --target ${{ matrix.target }}
-
+      
       - name: Package binary
         shell: bash
         run: |
           mkdir -p release_artifacts/${{ matrix.target }}
           cd target/${{ matrix.target }}/release
-          mkdir -p rfortune-${{ matrix.target }}
-          cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
+          mkdir rfortune-${{ matrix.target }}
+          cp rfortune* rfortune-${{ matrix.target }}/
           cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rfortune-${{ matrix.target }}/
-
+          
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             powershell -Command "Compress-Archive -Path rfortune-${{ matrix.target }} -DestinationPath rfortune-${{ matrix.target }}.zip"
             cp rfortune-${{ matrix.target }}.zip $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
@@ -51,71 +51,95 @@ jobs:
             tar -czvf rfortune-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
             cp rfortune-${{ matrix.target }}.tar.gz $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
           fi
-
+      
       - name: Generate SHA256 checksum
         shell: bash
         run: |
           cd release_artifacts/${{ matrix.target }}
           file="rfortune-${{ matrix.target }}.${{ matrix.ext }}"
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            pwsh -Command '
-              $file = "'"$file"'"
+            pwsh -Command "
+              $file = '$file'
               $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
-              "$hash *$file" | Out-File -Encoding utf8 "$file.sha256"
-            '
+              \"$hash *$file\" | Out-File -Encoding utf8 \"$file.sha256\"
+            "
           else
             sha256sum "$file" > "$file.sha256" || shasum -a 256 "$file" > "$file.sha256"
-          fi
-
+      
       - name: Sign with GPG
         shell: bash
         run: |
           cd release_artifacts/${{ matrix.target }}
           file="rfortune-${{ matrix.target }}.${{ matrix.ext }}"
           echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
-
-          echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
-            --pinentry-mode loopback \
+          echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --pinentry-mode loopback \
             --output "$file.sig" --detach-sign "$file"
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-
-      - name: Upload individual artifact
+      
+      - name: Upload artifact by platform
         uses: actions/upload-artifact@v4
         with:
           name: release_artifacts-${{ matrix.target }}
           path: release_artifacts/${{ matrix.target }}
-
-  upload-artifacts:
-    name: Upload All Artifacts
+  
+  consolidate:
+    name: Consolidate Artifacts
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: DEBUG - List All objects into working dir
-        shell: bash
-        run: |
-          echo "[DEBUG] Listing working directory" 
-          ls -lah . 
-
-      - name: Download all build artifacts from matrix
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: release_artifacts-*
           path: temp_download
           merge-multiple: true
-
-      - name: Consolidate all artifacts
+      
+      - name: Combine into single folder
         shell: bash
         run: |
-          echo "[DEBUG] list directory..."
-          ls -lah .
-          echo -e "\n"
           mkdir -p release_artifacts
           find temp_download -type f -exec cp {} release_artifacts/ \;
-
-      - name: Upload for Release
+      
+      - name: Upload consolidated artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release_artifacts
           path: release_artifacts
+  
+  release:
+    name: Create GitHub Release
+    needs: consolidate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download consolidated artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release_artifacts
+          path: release_artifacts
+      
+      - name: Extract version from Cargo.toml
+        id: extract_version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.extract_version.outputs.version }}
+          name: "v${{ steps.extract_version.outputs.version }}"
+          body_path: CHANGELOG.md
+          files: |
+            release_artifacts/rfortune-*
+            release_artifacts/*.sig
+            release_artifacts/*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
