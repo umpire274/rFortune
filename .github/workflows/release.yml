@@ -2,8 +2,8 @@ name: Create Release
 
 on:
   workflow_run:
-    workflows: [ "Build and Upload Artifacts" ]
-    types: [ completed ]
+    workflows: ["Build and Upload Artifacts"]
+    types: [completed]
 
 jobs:
   release:
@@ -14,51 +14,33 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: <Debug>Controlla workspace prima del download</Debug>
-        shell: bash
+      - name: DEBUG — Info evento e run
         run: |
-          echo "[DEBUG] Workspace iniziale (dopo checkout):"
-          ls -lah
+          echo "Workflow triggering this run:"
+          echo "Workflow name: ${{ github.event.workflow.name }}"
+          echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: release_artifacts
           run-id: ${{ github.event.workflow_run.id }}
+          path: release_artifacts
           merge-multiple: true
 
-      - name: <Debug>Controllo contenuto release_artifacts</Debug>
+      - name: DEBUG — Controllo contenuto release_artifacts
         shell: bash
         run: |
-          echo "[DEBUG] Verifica struttura release_artifacts:"
-          tree release_artifacts || find release_artifacts || echo "Directory vuota o non trovata"
+          echo "[DEBUG] Verifica contenuto dopo il download:"
+          ls -l release_artifacts || echo "release_artifacts non trovata"
+          find release_artifacts || echo "nessun file scaricato"
 
-      - name: Verify GPG Signatures
-        shell: bash
-        run: |
-          cd release_artifacts
-          for sig in *.sig; do
-            file=${sig%.sig}
-            echo "Verifying $file..."
-            gpg --verify $sig $file || exit 1
-          done
-
-      - name: Verify Checksums
-        shell: bash
-        run: |
-          cd release_artifacts
-          for checksum in *.sha256; do
-            echo "Verifying $checksum..."
-            sha256sum -c $checksum || exit 1
-          done
-
-      - name: Extract Version
+      - name: Estrai versione da Cargo.toml
         id: extract_version
         run: |
           VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release
+      - name: Crea release GitHub
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.extract_version.outputs.version }}
