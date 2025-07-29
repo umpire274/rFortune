@@ -14,11 +14,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: DEBUG — Info evento e run
+        run: |
+          echo "Workflow triggering this run:"
+          echo "Workflow name: ${{ github.event.workflow.name }}"
+          echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
+
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
           name: release_artifacts
           path: release_artifacts
+          run-id: '${{ github.event.workflow_run.id }}'
 
       - name: Debug — lista file scaricati
         shell: bash
