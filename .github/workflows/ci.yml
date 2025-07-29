@@ -90,10 +90,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: DEBUG - List All objetcs into working dir
+        shell: bash
+        run: |
+          echo "[DEBUG] Listing working directory" 
+          ls lah . 
+
       - name: Download all build artifacts from matrix
         uses: actions/download-artifact@v4
         with:
+          pattern: release_artifacts-*
           path: temp_download
+          merge-multiple: true
+
+      - name: DEBUG - verifica cosa è stato scaricato
+        shell: bash
+        run: |
+          echo "[DEBUG] Contenuto di temp_download:"
+          find temp_download || echo "temp_download è vuota o non trovata"
 
       - name: Move all platform builds into one folder
         shell: bash
