@@ -57,8 +57,13 @@ jobs:
         shell: bash
         run: |
           cd release_artifacts/${{ matrix.target }}
-          file=rfortune-${{ matrix.target }}.${{ matrix.ext }}
-          sha256sum "$file" > "$file.sha256"
+          file="rfortune-${{ matrix.target }}.${{ matrix.ext }}"
+          
+          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            shasum -a 256 "$file" > "$file.sha256"
+          else
+            sha256sum "$file" > "$file.sha256"
+          fi
 
       - name: Sign with GPG
         shell: bash
