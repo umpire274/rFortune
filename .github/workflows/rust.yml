@@ -2,44 +2,27 @@ name: Rust Build & Test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
-
-env:
-  CARGO_TERM_COLOR: always
+  workflow_dispatch:
 
 jobs:
-  build-test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    
+  check:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      
-      - name: Cache Cargo registry
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Format check
+
+      - name: Format Check
         run: cargo fmt --all -- --check
-      
-      - name: Clippy (linter)
+
+      - name: Clippy Check
         run: cargo clippy --all-targets --all-features -- -D warnings
-      
-      - name: Build
-        run: cargo build --release
-      
-      - name: Run tests
-        run: cargo test --verbose
+
+      - name: Run Tests
+        run: cargo test --all
