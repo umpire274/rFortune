@@ -94,7 +94,7 @@ jobs:
         shell: bash
         run: |
           echo "[DEBUG] Listing working directory" 
-          ls lah . 
+          ls -lah . 
 
       - name: Download all build artifacts from matrix
         uses: actions/download-artifact@v4
