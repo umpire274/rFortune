@@ -8,7 +8,7 @@ scripting, or just a bit of inspiration.
 ![CI](https://github.com/umpire274/rfortune/actions/workflows/ci.yml/badge.svg)
 [![Licenza MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20Intel%20%7C%20macOS%20Apple%20Silicon-blue)](https://github.com/umpire274/rFortune/releases)
-[![Versione](https://img.shields.io/badge/version-0.2.1-orange)](https://github.com/umpire274/rfortune/releases/tag/v0.2.1)
+[![Versione](https://img.shields.io/badge/version-0.2.2-orange)](https://github.com/umpire274/rfortune/releases/tag/v0.2.2)
 
 ---
 
@@ -26,6 +26,41 @@ scripting, or just a bit of inspiration.
 ## 📦 Installation
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/rfortune.svg)](https://repology.org/project/rfortune/versions)
+
+---
+
+# 🍺 Homebrew Tap for rFortune
+
+This is the official Homebrew tap for [rFortune](https://github.com/umpire274/rFortune), a fast and cross-platform clone of the classic UNIX `fortune` command, written in Rust.
+
+Also, available on [crates.io](https://crates.io/crates/rfortune) for installation via `cargo install`.
+
+To install `rfortune` using Homebrew:
+
+```bash
+brew tap umpire274/rfortune
+brew install rfortune
+```
+
+Then simply run:
+
+```bash
+rfortune
+```
+
+You’ll see a randomly selected quote from a classic-style fortune file.
+
+---
+
+## 🖥️ Supported Platforms
+
+This tap provides **precompiled binaries** for:
+
+- ✅ macOS (Intel - `x86_64`)
+- ✅ macOS (Apple Silicon - `arm64`)
+- ✅ Linux (`x86_64`) via Homebrew on Linux
+
+The correct binary is automatically chosen based on your system architecture.
 
 ---
 

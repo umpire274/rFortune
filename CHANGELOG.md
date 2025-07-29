@@ -1,6 +1,14 @@
 # Changelog
 
-# Changelog
+## [v0.2.2] - 2025-07-29
+
+### Changed
+- Updated the `README.md` in the `homebrew-rfortune` tap repository to include installation instructions via Homebrew.
+
+### Notes
+- No changes to the binary or functionality of `rfortune` itself.
+
+---
 
 ## [v0.2.1] - 2025-07-29
 
