@@ -154,8 +154,12 @@ jobs:
       - name: <Debug>Verifica upload effettivo</Debug>
         shell: bash
         run: |
-          echo "Contenuto della directory di lavoro"
-          ls -lah *
+          echo "Workflow triggering this run:"
+          echo "Workflow name: ${{ github.event.workflow.name }}"
+          echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
+
+          echo -e "\nContenuto della directory di lavoro"
+          ls -lah .
           
           echo -e "\nControllo cartelle Artifact note:"
           ls -R ${{ github.workspace }}/release_artifacts || echo "Cartella non trovata"
