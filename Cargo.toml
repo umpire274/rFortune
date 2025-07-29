@@ -1,7 +1,22 @@
 [package]
 name = "rfortune"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
+authors = ["Umpire274 <umpire274@gmail.com>"]
+description = "A Rust-based clone of the classic UNIX 'fortune' command"
+homepage = "https://github.com/umpire274/rFortune"
+repository = "https://github.com/umpire274/rFortune"
+license = "MIT"
+readme = "README.md"
+keywords = ["fortune", "cli", "quotes", "unix"]
+categories = ["command-line-utilities"]
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+]
 
 [dependencies]
 rand = "0.9.2"

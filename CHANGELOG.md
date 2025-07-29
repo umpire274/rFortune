@@ -1,5 +1,25 @@
 # Changelog
 
+# Changelog
+
+## [v0.2.1] - 2025-07-29
+
+### Added
+- Support for publishing `rfortune` to [crates.io](https://crates.io/crates/rfortune)
+- Updated `Cargo.toml` with metadata required by crates.io:
+  - Package description, authors, license, keywords, categories
+  - Repository and homepage URLs
+  - Included files for packaging
+
+### Notes
+- This version does not introduce new features or changes to functionality.
+- Users can now install `rfortune` directly via:
+  ```bash
+  cargo install rfortune
+  ```
+  
+---
+
 ## [v0.2.0] - 2025-07-27
 
 ### ✨ Added
