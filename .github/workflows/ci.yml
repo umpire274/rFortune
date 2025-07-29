@@ -136,8 +136,29 @@ jobs:
               }
             }
 
+      - name: <Debug>Contenuto della directory release_artifacts</Debug>
+        shell: bash
+        run: |
+          echo "Contenuto di release_artifacts/"
+          ls -l release_artifacts
+          echo ""
+          echo "Checksum dei file:"
+          sha256sum release_artifacts/* || shasum -a 256 release_artifacts/*
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release_artifacts-${{ matrix.target }}
           path: release_artifacts/*
+
+      - name: <Debug>Verifica upload effettivo</Debug>
+        shell: bash
+        run: |
+          echo "Contenuto della directory di lavoro dopo upload-artifact:"
+          find . -type f | grep release_artifacts || echo "Nessun file trovato"
+          
+          echo "\nControllo cartelle Artifact note:"
+          ls -R ${{ github.workspace }}/release_artifacts || echo "Cartella non trovata"
+          
+          echo "\nFine debug. Nota: l'upload effettivo degli artifact è gestito da GitHub come archivio separato."
+          echo "I file caricati non vengono spostati o rimossi: puoi ispezionarli ancora nel filesystem locale."
