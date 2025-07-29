@@ -98,11 +98,11 @@ jobs:
           # Generate checksums
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             # Windows checksum (PowerShell)
-            pwsh -Command "
-              \$file = 'rfortune-${{ matrix.target }}.zip'
-              \$hash = (Get-FileHash -Algorithm SHA256 \$file).Hash.ToLower()
-              '\$hash *\$file' | Out-File -Encoding utf8 '\$file.sha256'
-            "
+            pwsh -Command '
+              $file = "rfortune-${{ matrix.target }}.zip"
+              $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
+              "$hash *$file" | Out-File -Encoding utf8 "$file.sha256"
+            '
           else
             # Unix checksum
             sha256sum rfortune-${{ matrix.target }}.* > rfortune-${{ matrix.target }}.sha256 || 
@@ -157,8 +157,8 @@ jobs:
           echo "Contenuto della directory di lavoro dopo upload-artifact:"
           find . -type f | grep release_artifacts || echo "Nessun file trovato"
           
-          echo "\nControllo cartelle Artifact note:"
+          echo -e "\nControllo cartelle Artifact note:"
           ls -R ${{ github.workspace }}/release_artifacts || echo "Cartella non trovata"
           
-          echo "\nFine debug. Nota: l'upload effettivo degli artifact è gestito da GitHub come archivio separato."
+          echo -e "\nFine debug. Nota: l'upload effettivo degli artifact è gestito da GitHub come archivio separato."
           echo "I file caricati non vengono spostati o rimossi: puoi ispezionarli ancora nel filesystem locale."
