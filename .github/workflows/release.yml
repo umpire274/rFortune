@@ -14,10 +14,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: <Debug>Controlla percorso prima del download</Debug>
+        shell: bash
+        run: |
+          echo "Workspace directory: $PWD"
+          echo "Contenuto iniziale del workspace (prima del download):"
+          ls -l . || echo "(vuoto)"
+
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: release_artifacts
+          path: release_artifacts/*
           run-id: ${{ github.event.workflow_run.id }}
           merge-multiple: true
 
