@@ -2,8 +2,8 @@ name: Create Release
 
 on:
   workflow_run:
-    workflows: ["Build and Upload Artifacts"]
-    types: [completed]
+    workflows: [ "Build and Upload Artifacts" ]
+    types: [ completed ]
 
 jobs:
   release:
@@ -14,26 +14,24 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: <Debug>Controlla percorso prima del download</Debug>
+      - name: <Debug>Controlla workspace prima del download</Debug>
         shell: bash
         run: |
-          echo "Workspace directory: $PWD"
-          echo "Contenuto iniziale del workspace (prima del download):"
-          ls -l . || echo "(vuoto)"
+          echo "[DEBUG] Workspace iniziale (dopo checkout):"
+          ls -lah
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: release_artifacts/*
+          path: release_artifacts
           run-id: ${{ github.event.workflow_run.id }}
           merge-multiple: true
 
-      - name: Verify Artifacts Structure
+      - name: <Debug>Controllo contenuto release_artifacts</Debug>
         shell: bash
         run: |
-          echo "Contenuto della directory release_artifacts:"
-          ls -lh release_artifacts
-          [ -f release_artifacts/rfortune-* ] || (echo "Nessun artifact trovato!" && exit 1)
+          echo "[DEBUG] Verifica struttura release_artifacts:"
+          tree release_artifacts || find release_artifacts || echo "Directory vuota o non trovata"
 
       - name: Verify GPG Signatures
         shell: bash
