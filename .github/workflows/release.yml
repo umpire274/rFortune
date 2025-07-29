@@ -15,10 +15,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: DEBUG — Info evento e run
+        shell: bash
         run: |
           echo "Workflow triggering this run:"
           echo "Workflow name: ${{ github.event.workflow.name }}"
           echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
+          echo -e "\nLista del contenuto della directory"
+          ls -lah .
 
       - name: Download release artifacts
         uses: actions/download-artifact@v4
@@ -31,7 +34,9 @@ jobs:
       - name: Debug — lista file scaricati
         shell: bash
         run: |
-          echo "Contenuto scaricato:"
+          echo "Lista contenuti scaricati"
+          ls -lah .
+          echo "\nContenuto scaricato:"
           find release_artifacts || echo "Nessun file trovato"
 
       - name: Estrai versione da Cargo.toml
