@@ -1,9 +1,9 @@
 name: Build and Upload Artifacts
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["Rust Build & Test"]
+    types: [completed]
 
 jobs:
   build:
@@ -27,12 +27,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install Rust target
-        run: rustup target add ${{ matrix.target }}
-
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package binary and resources
         shell: bash
@@ -90,7 +84,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: DEBUG - List All objetcs into working dir
+      - name: DEBUG - List All objects into working dir
         shell: bash
         run: |
           echo "[DEBUG] Listing working directory" 
