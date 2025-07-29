@@ -2,11 +2,12 @@ name: Build and Upload Artifacts
 
 on:
   workflow_run:
-    workflows: ["Rust Build & Test"]
-    types: [completed]
+    workflows: [ "Rust Build & Test" ]
+    types: [ completed ]
 
 jobs:
   build:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -28,14 +29,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Package binary and resources
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package binary
         shell: bash
         run: |
           mkdir -p release_artifacts/${{ matrix.target }}
           cd target/${{ matrix.target }}/release
           mkdir -p rfortune-${{ matrix.target }}
           cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
-          cp $GITHUB_WORKSPACE/README.md $GITHUB_WORKSPACE/CHANGELOG.md $GITHUB_WORKSPACE/LICENSE rfortune-${{ matrix.target }}/
+          cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rfortune-${{ matrix.target }}/
 
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             powershell -Command "Compress-Archive -Path rfortune-${{ matrix.target }} -DestinationPath rfortune-${{ matrix.target }}.zip"
@@ -65,7 +72,6 @@ jobs:
         run: |
           cd release_artifacts/${{ matrix.target }}
           file="rfortune-${{ matrix.target }}.${{ matrix.ext }}"
-
           echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
 
           echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
@@ -77,9 +83,8 @@ jobs:
 
   upload-artifacts:
     name: Upload All Artifacts
-    runs-on: ubuntu-latest
     needs: build
-    if: ${{ always() }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -97,19 +102,13 @@ jobs:
           path: temp_download
           merge-multiple: true
 
-      - name: DEBUG - verifica cosa è stato scaricato
+      - name: Consolidate all artifacts
         shell: bash
         run: |
-          echo "[DEBUG] Contenuto di temp_download:"
-          find temp_download || echo "temp_download è vuota o non trovata"
+          mkdir -p release_artifacts
+          find temp_download -type f -exec cp {} release_artifacts/ \;
 
-      - name: Move all platform builds into one folder
-        shell: bash
-        run: |
-          mkdir release_artifacts
-          find temp_download -type f -name "rfortune-*" -exec cp {} release_artifacts/ \;
-
-      - name: Upload combined artifacts for release
+      - name: Upload for Release
         uses: actions/upload-artifact@v4
         with:
           name: release_artifacts
