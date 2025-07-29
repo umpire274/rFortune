@@ -3,11 +3,10 @@ name: Build and Upload Artifacts
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build Binaries
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -26,143 +25,74 @@ jobs:
             ext: zip
 
     steps:
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust Target
+      - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
 
-      - name: Build Release Binary
+      - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Build Package
+      - name: Package binary and resources
         shell: bash
         run: |
-          # Set global artifacts directory
-          export ARTIFACTS_DIR="$PWD/release_artifacts"
-          mkdir -p "$ARTIFACTS_DIR"
-          
-          # Build package
+          mkdir -p release_artifacts/${{ matrix.target }}
           cd target/${{ matrix.target }}/release
           mkdir -p rfortune-${{ matrix.target }}
           cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
           cp $GITHUB_WORKSPACE/README.md $GITHUB_WORKSPACE/CHANGELOG.md $GITHUB_WORKSPACE/LICENSE rfortune-${{ matrix.target }}/
 
-      - name: Package Windows Binary
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          # Path assoluti per evitare problemi
-          $baseDir = $pwd
-          $artifactsDir = "$baseDir/release_artifacts"
-          $targetDir = "$baseDir/target/${{ matrix.target }}/release"
-          
-          # Lavora nella directory di build
-          Push-Location $targetDir
-          
-          try {
-            # Prepara la directory del pacchetto
-            $packageDir = "rfortune-${{ matrix.target }}"
-            $zipPath = "$artifactsDir/rfortune-${{ matrix.target }}.zip"
-            Compress-Archive -Path "$packageDir/*" -DestinationPath $zipPath -CompressionLevel Optimal
-          
-            Write-Host "ZIP creato correttamente in $zipPath"
-          }
-          finally {
-            # Torna sempre alla directory originale
-            Pop-Location
-          }
-
-      - name: Compress with tar on Unix
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          export ARTIFACTS_DIR="$PWD/release_artifacts"
-          cd target/${{ matrix.target }}/release
-          tar -czvf $ARTIFACTS_DIR/rfortune-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
-
-      - name: Checksum and Sign Package
-        shell: bash
-        run: |
-          # Setup GPG (once for all operations)
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --batch --import
-          echo "use-agent" >> ~/.gnupg/gpg.conf
-          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
-          gpgconf --kill gpg-agent
-          gpgconf --launch gpg-agent
-
-          export ARTIFACTS_DIR="$PWD/release_artifacts"        
-          cd "$ARTIFACTS_DIR"
-          
-          # Generate checksums
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            # Windows checksum (PowerShell)
-            pwsh -Command '
-              $file = "rfortune-${{ matrix.target }}.zip"
-              $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
-              "$hash *$file" | Out-File -Encoding utf8 "$file.sha256"
-            '
+          if [[ "${{ matrix.ext }}" == "zip" ]]; then
+            cd rfortune-${{ matrix.target }}
+            zip -r ../rfortune-${{ matrix.target }}.zip .
+            cd ..
+            cp rfortune-${{ matrix.target }}.zip $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
           else
-            # Unix checksum
-            sha256sum rfortune-${{ matrix.target }}.* > rfortune-${{ matrix.target }}.sha256 || 
-            shasum -a 256 rfortune-${{ matrix.target }}.* > rfortune-${{ matrix.target }}.sha256
+            tar -czvf rfortune-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
+            cp rfortune-${{ matrix.target }}.tar.gz $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
           fi
-          
-          # Sign artifacts (works for all platforms)
-          for f in rfortune-${{ matrix.target }}.*; do
-            [[ "$f" == *.sig || "$f" == *.sha256 ]] && continue
-            gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
-                --output "$f.sig" --detach-sign "$f"
-          done
 
-      - name: Clean Previous Artifacts
-        if: matrix.os == 'ubuntu-latest' && matrix.target == 'x86_64-unknown-linux-gnu'
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-            for (const artifact of artifacts.artifacts) {
-              if (artifact.name.startsWith('release_artifacts')) {
-                await github.rest.actions.deleteArtifact({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  artifact_id: artifact.id,
-                });
-              }
-            }
-
-      - name: <Debug>Contenuto della directory release_artifacts</Debug>
+      - name: Generate SHA256 checksum
         shell: bash
         run: |
-          echo "Contenuto di release_artifacts/"
-          ls -l release_artifacts
-          echo ""
-          echo "Checksum dei file:"
-          sha256sum release_artifacts/* || shasum -a 256 release_artifacts/*
+          cd release_artifacts/${{ matrix.target }}
+          file=rfortune-${{ matrix.target }}.${{ matrix.ext }}
+          sha256sum "$file" > "$file.sha256"
 
-      - name: Upload Artifacts
+      - name: Sign with GPG
+        shell: bash
+        run: |
+          cd release_artifacts/${{ matrix.target }}
+          echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
+          echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --pinentry-mode loopback \
+            --output "$file.sig" --detach-sign "$file"
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+  upload-artifacts:
+    name: Upload All Artifacts
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ always() }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts from matrix
+        uses: actions/download-artifact@v4
+        with:
+          path: temp_download
+
+      - name: Move all platform builds into one folder
+        shell: bash
+        run: |
+          mkdir release_artifacts
+          find temp_download -type f -name "rfortune-*" -exec cp {} release_artifacts/ \;
+
+      - name: Upload combined artifacts for release
         uses: actions/upload-artifact@v4
         with:
-          name: release_artifacts-${{ matrix.target }}
-          path: release_artifacts/*
-
-      - name: <Debug>Verifica upload effettivo</Debug>
-        shell: bash
-        run: |
-          echo "Workflow triggering this run:"
-          echo "Workflow name: ${{ github.event.workflow.name }}"
-          echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
-
-          echo -e "\nContenuto della directory di lavoro"
-          ls -lah .
-          
-          echo -e "\nControllo cartelle Artifact note:"
-          ls -R ${{ github.workspace }}/release_artifacts || echo "Cartella non trovata"
-          
-          echo -e "\nFine debug. Nota: l'upload effettivo degli artifact è gestito da GitHub come archivio separato."
-          echo "I file caricati non vengono spostati o rimossi: puoi ispezionarli ancora nel filesystem locale."
+          name: release_artifacts
+          path: release_artifacts
