@@ -8,7 +8,7 @@ scripting, or just a bit of inspiration.
 ![CI](https://github.com/umpire274/rfortune/actions/workflows/ci.yml/badge.svg)
 [![Licenza MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20Intel%20%7C%20macOS%20Apple%20Silicon-blue)](https://github.com/umpire274/rFortune/releases)
-[![Versione](https://img.shields.io/badge/version-0.2.0-orange)](https://github.com/umpire274/rfortune/releases/tag/v0.2.0)
+[![Versione](https://img.shields.io/badge/version-0.2.1-orange)](https://github.com/umpire274/rfortune/releases/tag/v0.2.1)
 
 ---
 
