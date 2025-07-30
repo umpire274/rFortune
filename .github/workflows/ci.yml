@@ -30,22 +30,25 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Extract version (Unix)
+        if: matrix.os != 'windows-latest'
         id: extract_version_unix
         shell: bash
         run: |
-          if [[ "${{ matrix.os }}" != "windows-latest" ]]; then
-            VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
-            echo "VERSION=$VERSION" >> $GITHUB_ENV
-          fi
+          VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Extract version (Windows)
-        id: extract_version_windows
+        if: matrix.os == 'windows-latest'
+        id: extract_version_win
         shell: pwsh
         run: |
-          if ("${{ matrix.os }}" -eq "windows-latest") {
-            $content = Get-Content Cargo.toml
-            $version = ($content -match '^version\s*=\s*\"(.+?)\"')[0] -replace 'version\s*=\s*\"(.+?)\"', '$1'
-            echo \"VERSION=$version\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $content = Get-Content Cargo.toml
+          foreach ($line in $content) {
+            if ($line -match '^version\s*=\s*\"(.+?)\"') {
+              $VERSION = $matches[1]
+              "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+              break
+            }
           }
 
       - name: Install Rust target
