@@ -1,6 +1,8 @@
 use crate::loader::FortuneFile;
 use rand::seq::IndexedRandom;
 use std::fs;
+use std::fs::{create_dir_all, File};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub fn random_quote(quotes: &[String]) -> &str {
@@ -54,5 +56,48 @@ pub fn random_nonrepeating<'a>(quotes: &'a [String], last: Option<&str>) -> &'a 
         quotes.choose(&mut rng).unwrap()
     } else {
         filtered.choose(&mut rng).unwrap()
+    }
+}
+
+pub fn get_default_path() -> PathBuf {
+    if cfg!(target_os = "windows") {
+        if let Some(home_dir) = dirs::data_dir() {
+            return home_dir.join("rfortune").join("rfortunes.dat");
+        }
+        PathBuf::from("C:\\Users\\Public\\rfortune\\rfortunes.dat")
+    } else {
+        PathBuf::from("/usr/local/share/rfortune/rfortunes.dat")
+    }
+}
+
+pub fn init_default_file() -> Result<(), String> {
+    let path = get_default_path();
+    if let Some(parent) = path.parent() {
+        create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    let mut file = File::create(&path).map_err(|e| format!("Failed to create file: {}", e))?;
+    let sample = "%\nThe best way to get a good idea is to get a lot of ideas.\n%\nDo or do not. There is no try.\n%\nTo iterate is human, to recurse divine.\n%\n";
+    file.write_all(sample.as_bytes())
+        .map_err(|e| format!("Failed to write to file: {}", e))?;
+
+    println!("Initialized default fortune file at: {}", path.display());
+    Ok(())
+}
+
+pub fn clear_cache_dir() -> Result<(), String> {
+    if let Some(mut cache_dir) = dirs::data_local_dir() {
+        cache_dir.push("rfortune");
+        cache_dir.push("cache");
+
+        if cache_dir.exists() {
+            fs::remove_dir_all(&cache_dir)
+                .map_err(|e| format!("Failed to remove cache directory: {}", e))?;
+            Ok(())
+        } else {
+            Ok(()) // Nessuna directory da cancellare
+        }
+    } else {
+        Err("Unable to determine system data directory.".to_string())
     }
 }

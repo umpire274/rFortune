@@ -1,39 +1,11 @@
 use clap::{Arg, Command};
 use std::env;
-use std::fs::{create_dir_all, File};
-use std::io::Write;
 use std::path::PathBuf;
 
 use rfortune::loader::FortuneFile;
-use rfortune::utils::print_random;
+use rfortune::utils::{get_default_path, init_default_file, print_random};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-fn get_default_path() -> PathBuf {
-    if cfg!(target_os = "windows") {
-        if let Some(home_dir) = dirs::data_dir() {
-            return home_dir.join("rfortune").join("rfortunes.dat");
-        }
-        PathBuf::from("C:\\Users\\Public\\rfortune\\rfortunes.dat")
-    } else {
-        PathBuf::from("/usr/local/share/rfortune/rfortunes.dat")
-    }
-}
-
-fn init_default_file() -> Result<(), String> {
-    let path = get_default_path();
-    if let Some(parent) = path.parent() {
-        create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
-    }
-
-    let mut file = File::create(&path).map_err(|e| format!("Failed to create file: {}", e))?;
-    let sample = "%\nThe best way to get a good idea is to get a lot of ideas.\n%\nDo or do not. There is no try.\n%\nTo iterate is human, to recurse divine.\n%\n";
-    file.write_all(sample.as_bytes())
-        .map_err(|e| format!("Failed to write to file: {}", e))?;
-
-    println!("Initialized default fortune file at: {}", path.display());
-    Ok(())
-}
 
 fn main() {
     let matches = Command::new("rFortune")
@@ -54,7 +26,21 @@ fn main() {
                 .help("Initialize default fortune file and directory")
                 .action(clap::ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("clear-cache")
+                .long("clear-cache")
+                .help("Delete all cached quote history")
+                .action(clap::ArgAction::SetTrue),
+        )
         .get_matches();
+
+    if *matches.get_one::<bool>("clear-cache").unwrap_or(&false) {
+        match rfortune::utils::clear_cache_dir() {
+            Ok(_) => println!("Cache cleared successfully."),
+            Err(e) => eprintln!("Error clearing cache: {}", e),
+        }
+        return;
+    }
 
     if matches.get_flag("init") {
         if let Err(e) = init_default_file() {
