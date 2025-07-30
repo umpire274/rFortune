@@ -8,7 +8,7 @@ scripting, or just a bit of inspiration.
 ![CI](https://github.com/umpire274/rfortune/actions/workflows/ci.yml/badge.svg)
 [![Licenza MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20Intel%20%7C%20macOS%20Apple%20Silicon-blue)](https://github.com/umpire274/rFortune/releases)
-[![Versione](https://img.shields.io/badge/version-0.2.2-orange)](https://github.com/umpire274/rfortune/releases/tag/v0.2.2)
+[![Versione](https://img.shields.io/badge/version-0.3.0-orange)](https://github.com/umpire274/rfortune/releases/tag/v0.3.0)
 
 ---
 
@@ -19,7 +19,8 @@ scripting, or just a bit of inspiration.
 - 📁 Simple input format: one or more lines per fortune, separated by `%`
 - 🌹 UTF-8 support for multilingual content
 - 🧩 Easily extensible
-- ✨ Supports `--file`, `--init`, `--version`, and `--help` options
+- 🧠 Built-in cache system to avoid showing the same fortune twice in a row
+- ✨ Supports various command-line options including file selection, cache management, version display, and more
 
 ---
 
@@ -27,40 +28,37 @@ scripting, or just a bit of inspiration.
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/rfortune.svg)](https://repology.org/project/rfortune/versions)
 
----
+### 🐧 AUR (Arch Linux)
+[![AUR](https://img.shields.io/aur/version/rfortune)](https://aur.archlinux.org/packages/rfortune)
 
-# 🍺 Homebrew Tap for rFortune
+```bash
+yay -S rfortune
+# oppure
+paru -S rfortune
+```
 
-This is the official Homebrew tap for [rFortune](https://github.com/umpire274/rFortune), a fast and cross-platform clone of the classic UNIX `fortune` command, written in Rust.
-
-Also, available on [crates.io](https://crates.io/crates/rfortune) for installation via `cargo install`.
-
-To install `rfortune` using Homebrew:
+### 🍺 Homebrew (macOS/Linux)
+[![Homebrew Tap](https://img.shields.io/badge/homebrew-tap-brightgreen)](https://github.com/umpire274/homebrew-rfortune)
 
 ```bash
 brew tap umpire274/rfortune
 brew install rfortune
 ```
 
-Then simply run:
+### 🪟 Scoop (Windows)
+[![Scoop](https://img.shields.io/badge/scoop-rfortune-blue)](https://github.com/ScoopInstaller/Main/pull/XXX)
 
-```bash
-rfortune
+```powershell
+scoop bucket add main
+scoop install rfortune
 ```
 
-You’ll see a randomly selected quote from a classic-style fortune file.
+### 🦀 Crates.io (Rust)
+[![Crates.io](https://img.shields.io/crates/v/rfortune)](https://crates.io/crates/rfortune)
 
----
-
-## 🖥️ Supported Platforms
-
-This tap provides **precompiled binaries** for:
-
-- ✅ macOS (Intel - `x86_64`)
-- ✅ macOS (Apple Silicon - `arm64`)
-- ✅ Linux (`x86_64`) via Homebrew on Linux
-
-The correct binary is automatically chosen based on your system architecture.
+```bash
+cargo install rfortune
+```
 
 ---
 
@@ -145,6 +143,7 @@ rfortune [--file path/to/quotes.dat]
 |-------------------|--------------------------------------------|
 | `-f`, `--file`    | Use a custom file of fortunes              |
 | `--init`          | Create the default directory and test file |
+| `--clear-cache`   | Delete all cached quote history            |
 | `-V`, `--version` | Show version                               |
 | `-h`, `--help`    | Show help message                          |
 
@@ -172,6 +171,17 @@ The best way to get a good idea is to get a lot of ideas.
 Do or do not. There is no try.
 %
 To iterate is human, to recurse divine.
+%
+```
+
+You may optionally add a title at the top of the file by starting the first line with #. The title will be printed before the random quote:
+
+```txt
+# Murphy's Laws
+%
+Anything that can go wrong will go wrong.
+%
+If there's a possibility of several things going wrong, the one that will cause the most damage will be the one to go wrong.
 %
 ```
 

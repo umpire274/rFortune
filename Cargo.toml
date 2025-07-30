@@ -1,6 +1,6 @@
 [package]
 name = "rfortune"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2021"
 authors = ["Umpire274 <umpire274@gmail.com>"]
 description = "A Rust-based clone of the classic UNIX 'fortune' command"
@@ -20,5 +20,5 @@ include = [
 
 [dependencies]
 rand = "0.9.2"
-clap = { version = "4.5.41", features = ["derive"] }
+clap = { version = "4.5.42", features = ["derive"] }
 dirs = "6.0.0"
