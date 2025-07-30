@@ -58,7 +58,7 @@ jobs:
         shell: bash
         run: |
           cd release_artifacts/${{ matrix.target }}
-          file="rfortune-${{ matrix.target }}.${{ matrix.ext }}"
+          file="rfortune-${VERSION}-${{ matrix.target }}.${{ matrix.ext }}"
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             pwsh -Command '
               $file = "'"$file"'"
@@ -73,7 +73,7 @@ jobs:
         shell: bash
         run: |
           cd release_artifacts/${{ matrix.target }}
-          file="rfortune-${{ matrix.target }}.${{ matrix.ext }}"
+          file="rfortune-${VERSION}-${{ matrix.target }}.${{ matrix.ext }}"
           echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
 
           echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
