@@ -37,14 +37,14 @@ fn main() {
     if *matches.get_one::<bool>("clear-cache").unwrap_or(&false) {
         match rfortune::utils::clear_cache_dir() {
             Ok(_) => println!("Cache cleared successfully."),
-            Err(e) => eprintln!("Error clearing cache: {}", e),
+            Err(e) => eprintln!("Error clearing cache: {e}"),
         }
         return;
     }
 
     if matches.get_flag("init") {
         if let Err(e) = init_default_file() {
-            eprintln!("Initialization error: {}", e);
+            eprintln!("Initialization error: {e}");
         }
         return;
     }
@@ -56,6 +56,6 @@ fn main() {
 
     match FortuneFile::from_file(&filepath) {
         Ok(fortune_file) => print_random(&fortune_file, &filepath),
-        Err(err) => eprintln!("Error: {}", err),
+        Err(err) => eprintln!("Error: {err}"),
     }
 }
