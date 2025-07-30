@@ -69,7 +69,7 @@ fn main() {
         .unwrap_or_else(get_default_path);
 
     match FortuneFile::from_file(&filepath) {
-        Ok(fortune_file) => print_random(&fortune_file),
+        Ok(fortune_file) => print_random(&fortune_file, &filepath),
         Err(err) => eprintln!("Error: {}", err),
     }
 }
