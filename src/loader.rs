@@ -10,7 +10,7 @@ pub struct FortuneFile {
 
 impl FortuneFile {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let file = fs::File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
+        let file = fs::File::open(&path).map_err(|e| format!("Failed to open file: {e}"))?;
         let reader = BufReader::new(file);
 
         let mut title: Option<String> = None;
@@ -19,7 +19,7 @@ impl FortuneFile {
         let mut is_first_line = true;
 
         for line in reader.lines() {
-            let line = line.map_err(|e| format!("Failed to read line: {}", e))?;
+            let line = line.map_err(|e| format!("Failed to read line: {e}"))?;
             let trimmed = line.trim();
 
             if is_first_line && trimmed.starts_with('#') {

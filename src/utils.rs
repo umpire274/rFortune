@@ -16,9 +16,9 @@ pub fn print_random(fortune_file: &FortuneFile, file_path: &Path) {
     let quote = random_nonrepeating(&fortune_file.quotes, last_used.as_deref());
 
     if let Some(title) = &fortune_file.title {
-        println!("{}\n", title);
+        println!("{title}\n");
     }
-    println!("{}", quote);
+    println!("{quote}");
 
     write_last_cache(&cache_path, quote);
 }
@@ -73,13 +73,13 @@ pub fn get_default_path() -> PathBuf {
 pub fn init_default_file() -> Result<(), String> {
     let path = get_default_path();
     if let Some(parent) = path.parent() {
-        create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+        create_dir_all(parent).map_err(|e| format!("Failed to create directory: {e}"))?;
     }
 
-    let mut file = File::create(&path).map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = File::create(&path).map_err(|e| format!("Failed to create file: {e}"))?;
     let sample = "%\nThe best way to get a good idea is to get a lot of ideas.\n%\nDo or do not. There is no try.\n%\nTo iterate is human, to recurse divine.\n%\n";
     file.write_all(sample.as_bytes())
-        .map_err(|e| format!("Failed to write to file: {}", e))?;
+        .map_err(|e| format!("Failed to write to file: {e}"))?;
 
     println!("Initialized default fortune file at: {}", path.display());
     Ok(())
@@ -92,7 +92,7 @@ pub fn clear_cache_dir() -> Result<(), String> {
 
         if cache_dir.exists() {
             fs::remove_dir_all(&cache_dir)
-                .map_err(|e| format!("Failed to remove cache directory: {}", e))?;
+                .map_err(|e| format!("Failed to remove cache directory: {e}"))?;
             Ok(())
         } else {
             Ok(()) // Nessuna directory da cancellare
