@@ -2,8 +2,8 @@ name: Build, Package and Release
 
 on:
   workflow_run:
-    workflows: ["Rust Build & Test"]
-    types: [completed]
+    workflows: [ "Rust Build & Test" ]
+    types: [ completed ]
 
 jobs:
   build:
@@ -28,18 +28,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
+      - name: Extract version
+        id: extract_version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
-      
+
       - name: Build binary
         run: cargo build --release --target ${{ matrix.target }}
-      
+
       - name: Package binary
         shell: bash
         run: |
-          VERSION=$(grep '^version' $GITHUB_WORKSPACE/Cargo.toml | head -n1 | cut -d '"' -f2)
-
           mkdir -p release_artifacts/${{ matrix.target }}
           cd target/${{ matrix.target }}/release
           mkdir -p rfortune-${{ matrix.target }}
@@ -53,7 +57,7 @@ jobs:
             tar -czvf rfortune-${VERSION}-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
             cp rfortune-${VERSION}-${{ matrix.target }}.tar.gz $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
           fi
-      
+
       - name: Generate SHA256 checksum
         shell: bash
         run: |
@@ -82,7 +86,7 @@ jobs:
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      
+
       - name: Upload artifact by platform
         uses: actions/upload-artifact@v4
         with:
@@ -96,20 +100,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: release_artifacts-*
           path: temp_download
           merge-multiple: true
-      
+
       - name: Combine into single folder
         shell: bash
         run: |
           mkdir -p release_artifacts
           find temp_download -type f -exec cp {} release_artifacts/ \;
-      
+
       - name: Upload consolidated artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -123,19 +127,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Download consolidated artifacts
         uses: actions/download-artifact@v4
         with:
           name: release_artifacts
           path: release_artifacts
-      
+
       - name: Extract version from Cargo.toml
         id: extract_version
         run: |
           VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-      
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
