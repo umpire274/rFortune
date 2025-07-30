@@ -1,5 +1,28 @@
 # Changelog
 
+## [v0.3.0] - 2025-07-30
+
+### 🔧 Refactoring
+- Removed `fortune.rs` and consolidated logic into new `utils.rs`
+- Updated `main.rs` and `lib.rs` to use `rfortune` crate structure consistently
+
+### 🧪 Unit Testing
+- Added unit tests for `loader` module (parsing `.dat` files)
+- Added unit tests for `utils` module, including `random_quote` and `print_random`
+- Fixed the signature of `print_random()` to accept file path for cache handling
+
+### 💾 Cache Support
+- Implemented cache system to avoid repeating the same fortune twice
+- Cache is stored in user-specific system path (`$XDG_DATA_HOME/rfortune/cache/` or `%APPDATA%\rfortune\cache\`)
+- Added tests for reading/writing cache and ensuring uniqueness of quotes
+- Introduced `--clear-cache` flag to manually delete the entire cache directory
+
+### ✅ Misc
+- Ensured full cross-platform compatibility (Linux, macOS, Windows)
+- Cleaned up unused code and improved module boundaries
+
+---
+
 ## [v0.2.2] - 2025-07-29
 
 ### Changed
