@@ -1,6 +1,6 @@
-use std::env;
 use rfortune::loader::FortuneFile;
-use rfortune::utils::{random_quote, print_random, get_cache_path, read_last_cache};
+use rfortune::utils::{get_cache_path, print_random, random_quote, read_last_cache};
+use std::env;
 
 #[test]
 fn test_random_quote_selection() {

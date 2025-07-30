@@ -1,15 +1,16 @@
+use rfortune::loader::FortuneFile;
 use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use rfortune::loader::FortuneFile;
 
 fn create_temp_file(content: &str, filename: &str) -> String {
     let mut path: PathBuf = env::temp_dir();
     path.push(filename);
 
     let mut file = File::create(&path).expect("Failed to create temp file");
-    file.write_all(content.as_bytes()).expect("Failed to write to temp file");
+    file.write_all(content.as_bytes())
+        .expect("Failed to write to temp file");
 
     path.to_string_lossy().to_string()
 }
