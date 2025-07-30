@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Extract version (Unix)
-        id: extract_version
+        id: extract_version_unix
         shell: bash
         run: |
           if [[ "${{ matrix.os }}" != "windows-latest" ]]; then
@@ -39,7 +39,7 @@ jobs:
           fi
 
       - name: Extract version (Windows)
-        id: extract_version
+        id: extract_version_windows
         shell: pwsh
         run: |
           if ("${{ matrix.os }}" -eq "windows-latest") {
