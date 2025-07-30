@@ -38,6 +38,8 @@ jobs:
       - name: Package binary
         shell: bash
         run: |
+          VERSION=$(grep '^version' $GITHUB_WORKSPACE/Cargo.toml | head -n1 | cut -d '"' -f2)
+
           mkdir -p release_artifacts/${{ matrix.target }}
           cd target/${{ matrix.target }}/release
           mkdir -p rfortune-${{ matrix.target }}
@@ -45,11 +47,11 @@ jobs:
           cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rfortune-${{ matrix.target }}/
           
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            powershell -Command "Compress-Archive -Path rfortune-${{ matrix.target }}\\* -DestinationPath rfortune-${{ matrix.target }}.zip"
-            cp rfortune-${{ matrix.target }}.zip $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
+            powershell -Command "Compress-Archive -Path rfortune-${{ matrix.target }}\\* -DestinationPath rfortune-${VERSION}-${{ matrix.target }}.zip"
+            cp rfortune-${VERSION}-${{ matrix.target }}.zip $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
           else
-            tar -czvf rfortune-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
-            cp rfortune-${{ matrix.target }}.tar.gz $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
+            tar -czvf rfortune-${VERSION}-${{ matrix.target }}.tar.gz rfortune-${{ matrix.target }}
+            cp rfortune-${VERSION}-${{ matrix.target }}.tar.gz $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
           fi
       
       - name: Generate SHA256 checksum
