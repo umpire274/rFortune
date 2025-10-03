@@ -1,61 +1,46 @@
-use clap::{Arg, Command};
-use std::env;
-use std::path::PathBuf;
+use clap::Parser;
+use rfortune::{config, loader, utils};
 
-use rfortune::loader::FortuneFile;
-use rfortune::utils::{get_default_path, init_default_file, print_random};
+mod cli;
+mod commands;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+use cli::{CacheAction, Cli, Commands, ConfigAction, FileAction};
 
 fn main() {
-    let matches = Command::new("rFortune")
-        .version(VERSION)
-        .author("Alessandro Maestri <your@email.com>")
-        .about("A Rust-based clone of the classic 'fortune' tool")
-        .arg(
-            Arg::new("file")
-                .short('f')
-                .long("file")
-                .value_name("FILE")
-                .help("Path to the .dat fortune file")
-                .num_args(1),
-        )
-        .arg(
-            Arg::new("init")
-                .long("init")
-                .help("Initialize default fortune file and directory")
-                .action(clap::ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("clear-cache")
-                .long("clear-cache")
-                .help("Delete all cached quote history")
-                .action(clap::ArgAction::SetTrue),
-        )
-        .get_matches();
+    let cli = Cli::parse();
 
-    if *matches.get_one::<bool>("clear-cache").unwrap_or(&false) {
-        match rfortune::utils::clear_cache_dir() {
-            Ok(_) => println!("Cache cleared successfully."),
-            Err(e) => eprintln!("Error clearing cache: {e}"),
+    match cli.command {
+        Some(Commands::Config {
+            action: ConfigAction::Init,
+        }) => {
+            commands::run_config_init();
         }
-        return;
-    }
-
-    if matches.get_flag("init") {
-        if let Err(e) = init_default_file() {
-            eprintln!("Initialization error: {e}");
+        Some(Commands::File {
+            action: FileAction::Init,
+        }) => {
+            commands::run_file_init();
         }
-        return;
-    }
+        Some(Commands::Cache {
+            action: CacheAction::Clear,
+        }) => {
+            commands::run_cache_clear();
+        }
+        None => {
+            // Comportamento standard: stampa una citazione casuale
+            let file_path = if let Some(path) = cli.file {
+                std::path::PathBuf::from(path)
+            } else {
+                config::get_default_path()
+            };
 
-    let filepath = matches
-        .get_one::<String>("file")
-        .map(PathBuf::from)
-        .unwrap_or_else(get_default_path);
-
-    match FortuneFile::from_file(&filepath) {
-        Ok(fortune_file) => print_random(&fortune_file, &filepath),
-        Err(err) => eprintln!("Error: {err}"),
+            match loader::FortuneFile::from_file(&file_path) {
+                Ok(fortune_file) => {
+                    if let Err(e) = utils::print_random(&fortune_file, &file_path) {
+                        eprintln!("Error: {e}");
+                    }
+                }
+                Err(e) => eprintln!("Error loading fortune file: {e}"),
+            }
+        }
     }
 }
