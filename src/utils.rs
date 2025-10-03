@@ -1,7 +1,7 @@
+use crate::config;
 use crate::loader::FortuneFile;
 use rand::seq::IndexedRandom;
 use std::fs;
-use std::fs::{create_dir_all, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -10,17 +10,28 @@ pub fn random_quote(quotes: &[String]) -> &str {
     quotes.choose(&mut rng).map(|s| s.as_str()).unwrap()
 }
 
-pub fn print_random(fortune_file: &FortuneFile, file_path: &Path) {
-    let cache_path = get_cache_path(file_path);
-    let last_used = read_last_cache(&cache_path);
-    let quote = random_nonrepeating(&fortune_file.quotes, last_used.as_deref());
+pub fn print_random(fortune_file: &FortuneFile, file_path: &Path) -> Result<(), String> {
+    // esempio: recupera la citazione casuale
+    let quote = if fortune_file.quotes.is_empty() {
+        return Err("No quotes found in the file.".to_string());
+    } else {
+        random_nonrepeating(&fortune_file.quotes, None)
+    };
 
+    // eventuale stampa titolo se presente
     if let Some(title) = &fortune_file.title {
-        println!("{title}\n");
+        println!("({title})");
     }
-    println!("{quote}");
 
-    write_last_cache(&cache_path, quote);
+    // stampa il contenuto
+    println!("{}", quote);
+
+    // qui salvi anche in cache se necessario
+    if let Err(e) = save_last_cache(file_path, quote) {
+        eprintln!("Warning: could not update cache: {e}");
+    }
+
+    Ok(())
 }
 
 pub fn get_cache_path(dat_path: &Path) -> PathBuf {
@@ -59,45 +70,30 @@ pub fn random_nonrepeating<'a>(quotes: &'a [String], last: Option<&str>) -> &'a 
     }
 }
 
-pub fn get_default_path() -> PathBuf {
-    if cfg!(target_os = "windows") {
-        if let Some(home_dir) = dirs::data_dir() {
-            return home_dir.join("rfortune").join("rfortunes.dat");
-        }
-        PathBuf::from("C:\\Users\\Public\\rfortune\\rfortunes.dat")
-    } else {
-        PathBuf::from("/usr/local/share/rfortune/rfortunes.dat")
-    }
+/// Directory della cache: .../rfortune/cache
+fn get_cache_dir() -> PathBuf {
+    let mut p = config::app_dir();
+    p.push("rfortune");
+    p.push("cache");
+    p
 }
 
-pub fn init_default_file() -> Result<(), String> {
-    let path = get_default_path();
-    if let Some(parent) = path.parent() {
-        create_dir_all(parent).map_err(|e| format!("Failed to create directory: {e}"))?;
+/// Svuota completamente la cache
+pub fn clear_cache_dir() -> std::io::Result<()> {
+    let dir = get_cache_dir();
+    if dir.exists() {
+        fs::remove_dir_all(&dir)?;
     }
-
-    let mut file = File::create(&path).map_err(|e| format!("Failed to create file: {e}"))?;
-    let sample = "%\nThe best way to get a good idea is to get a lot of ideas.\n%\nDo or do not. There is no try.\n%\nTo iterate is human, to recurse divine.\n%\n";
-    file.write_all(sample.as_bytes())
-        .map_err(|e| format!("Failed to write to file: {e}"))?;
-
-    println!("Initialized default fortune file at: {}", path.display());
     Ok(())
 }
 
-pub fn clear_cache_dir() -> Result<(), String> {
-    if let Some(mut cache_dir) = dirs::data_local_dir() {
-        cache_dir.push("rfortune");
-        cache_dir.push("cache");
-
-        if cache_dir.exists() {
-            fs::remove_dir_all(&cache_dir)
-                .map_err(|e| format!("Failed to remove cache directory: {e}"))?;
-            Ok(())
-        } else {
-            Ok(()) // Nessuna directory da cancellare
-        }
-    } else {
-        Err("Unable to determine system data directory.".to_string())
+/// Salva l’ultima citazione usata in un file di cache
+pub fn save_last_cache(file_path: &Path, quote: &str) -> std::io::Result<()> {
+    let cache_path = get_cache_path(file_path);
+    if let Some(parent) = cache_path.parent() {
+        fs::create_dir_all(parent)?; // assicura che la cartella esista
     }
+    let mut f = fs::File::create(cache_path)?;
+    f.write_all(quote.as_bytes())?;
+    Ok(())
 }

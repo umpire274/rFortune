@@ -26,7 +26,7 @@ fn test_print_random_output() {
     path.push("test_quotes.dat");
 
     // Verifica solo che non panichi (output testato altrove)
-    print_random(&fortune_file, &path);
+    let _ = print_random(&fortune_file, &path);
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn test_cache_read_write() {
     temp_path.push("test_cache.dat");
 
     // Prima esecuzione: salva una citazione
-    print_random(&fortune_file, &temp_path);
+    let _ = print_random(&fortune_file, &temp_path);
 
     // Leggi da cache
     let cache_path = get_cache_path(&temp_path);
