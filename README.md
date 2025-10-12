@@ -44,7 +44,7 @@ paru -S rfortune
 [![Homebrew](https://img.shields.io/badge/Homebrew-rFortune-orange.svg?logo=homebrew)](https://github.com/umpire274/homebrew-tap)
 
 ```bash
-brew tap umpire274/rfortune
+brew tap umpire274/tap
 brew install rfortune
 ```
 
