@@ -1,6 +1,6 @@
 [package]
 name = "rfortune"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2024"
 authors = ["Umpire274 <umpire274@gmail.com>"]
 description = "A Rust-based clone of the classic UNIX 'fortune' command"
@@ -18,8 +18,14 @@ include = [
     "CHANGELOG.md"
 ]
 
+[build-dependencies]
+winresource = "0.1.23"
+
+[package.metadata.winresource]
+Icon = "res/rfortune.ico"
+
 [dependencies]
-clap = { version = "4.5.48", features = ["derive"] }
+clap = { version = "4.5.50", features = ["derive"] }
 rand = "0.9.2"
 dirs = "6.0.0"
 serde = { version = "1.0.228", features = ["derive"] }
