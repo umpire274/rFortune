@@ -1,4 +1,7 @@
-# 🥠 rFortune
+<h1 style="text-align: left;">
+  <img src="res/rfortune.svg" width="90" style="vertical-align: middle; margin-right: 8px;" alt="rFortune Logo"/>
+  rFortune
+</h1>
 
 **rFortune** is a modern, cross-platform reimplementation of the classic Unix `fortune` program, written in Rust.
 

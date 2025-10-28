@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.1] - 2025-10-27
+
+### Added
+
+- Embedded Windows application icon (`res/rFortune.ico`) directly into the executable.
+    - Implemented using the `winres` build dependency.
+    - The icon is now visible in Windows Explorer and taskbar.
+- New `res/` directory introduced for graphical assets (SVG, PNG, ICO).
+
+### Changed
+
+- Build process updated to automatically compile and embed Windows resources during `cargo build --release`.
+
+### Notes
+
+- The `.res` file generated during build is temporary and not stored in the repository.
+
+---
+
 ## [v0.5.0] - 2025-10-04
 
 ### 🔧 Refactoring

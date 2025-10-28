@@ -54,6 +54,16 @@ jobs:
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
 
+      - name: Build (with icon embedding on Windows)
+        shell: bash
+        run: |
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            rustup default stable-x86_64-pc-windows-msvc
+            cargo build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
       - name: Build binary
         run: cargo build --release --target ${{ matrix.target }}
 
