@@ -1,3 +1,4 @@
+use crate::log::ConsoleLog;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -10,7 +11,16 @@ pub struct FortuneFile {
 
 impl FortuneFile {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let file = fs::File::open(&path).map_err(|e| format!("Failed to open file: {e}"))?;
+        let path_ref = path.as_ref();
+
+        let file = match fs::File::open(&path_ref) {
+            Ok(f) => f,
+            Err(e) => {
+                ConsoleLog::ko(format!("Failed to open file '{}': {e}", path_ref.display()));
+                return Err(format!("Failed to open file: {e}"));
+            }
+        };
+
         let reader = BufReader::new(file);
 
         let mut title: Option<String> = None;
@@ -19,7 +29,17 @@ impl FortuneFile {
         let mut is_first_line = true;
 
         for line in reader.lines() {
-            let line = line.map_err(|e| format!("Failed to read line: {e}"))?;
+            let line = match line {
+                Ok(l) => l,
+                Err(e) => {
+                    ConsoleLog::ko(format!(
+                        "Failed to read line from '{}': {e}",
+                        path_ref.display()
+                    ));
+                    return Err(format!("Failed to read line: {e}"));
+                }
+            };
+
             let trimmed = line.trim();
 
             if is_first_line && trimmed.starts_with('#') {
@@ -48,6 +68,10 @@ impl FortuneFile {
         }
 
         if quotes.is_empty() {
+            ConsoleLog::warn(format!(
+                "No quotes found in '{}'. The file may be empty or incorrectly formatted.",
+                path_ref.display()
+            ));
             return Err("No quotes found in the file.".to_string());
         }
 

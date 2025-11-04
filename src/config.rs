@@ -1,3 +1,4 @@
+use crate::log::ConsoleLog;
 use dirs::data_dir;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -24,7 +25,7 @@ pub(crate) fn app_dir() -> PathBuf {
 
 pub fn get_config_path() -> PathBuf {
     let mut p = app_dir();
-    p.push("config.yaml");
+    p.push("rfortune.conf");
     p
 }
 
@@ -40,9 +41,18 @@ pub fn init_config_file() -> std::io::Result<()> {
     let dir = app_dir();
     fs::create_dir_all(&dir)?;
 
+    if let Err(e) = migrate_old_config() {
+        ConsoleLog::warn(format!("Migration warning: {e}"));
+    }
+
     let path = get_config_path();
     if path.exists() {
-        return Ok(()); // non sovrascrivere
+        ConsoleLog::info("Configuration file already exists, skipping.");
+        return Ok(());
+    }
+
+    if let Err(e) = init_default_file() {
+        ConsoleLog::ko(format!("Error initializing fortune file: {e}"));
     }
 
     let cfg = Config {
@@ -51,7 +61,10 @@ pub fn init_config_file() -> std::io::Result<()> {
         use_cache: Some(true),
     };
     let yaml = serde_yaml::to_string(&cfg).expect("Failed to serialize config");
-    fs::write(path, yaml)
+    fs::write(path, yaml)?;
+
+    ConsoleLog::ok("Configuration file successfully created.");
+    Ok(())
 }
 
 /// Crea un file fortune di esempio (rfortune.dat) se assente
@@ -80,4 +93,48 @@ pub fn load_config() -> Option<Config> {
     let path = get_config_path();
     let content = fs::read_to_string(path).ok()?;
     serde_yaml::from_str(&content).ok()
+}
+
+/// Tenta di migrare una vecchia configurazione `config.yaml` a `rfortune.conf`
+pub fn migrate_old_config() -> std::io::Result<()> {
+    let dir = app_dir();
+    let old_path = dir.join("config.yaml");
+    let new_path = get_config_path();
+
+    // Se non c'è un vecchio file o esiste già il nuovo, non fare nulla
+    if !old_path.exists() || new_path.exists() {
+        return Ok(());
+    }
+
+    ConsoleLog::info("Old configuration file detected — attempting migration…");
+
+    // Legge e prova a deserializzare il vecchio file
+    match fs::read_to_string(&old_path) {
+        Ok(content) => match serde_yaml::from_str::<Config>(&content) {
+            Ok(cfg) => {
+                // Serializza e salva nel nuovo formato
+                let yaml =
+                    serde_yaml::to_string(&cfg).expect("Failed to serialize migrated config");
+                fs::write(&new_path, yaml)?;
+
+                // Rinomina il vecchio file come backup
+                let backup = dir.join("config.yaml.bak");
+                fs::rename(&old_path, &backup)?;
+
+                ConsoleLog::ok(format!(
+                    "Configuration migrated successfully → {:?}",
+                    new_path
+                ));
+                ConsoleLog::info(format!("Backup saved as {:?}", backup));
+            }
+            Err(e) => {
+                ConsoleLog::ko(format!("Failed to parse old config.yaml: {e}"));
+            }
+        },
+        Err(e) => {
+            ConsoleLog::ko(format!("Failed to read old config.yaml: {e}"));
+        }
+    }
+
+    Ok(())
 }

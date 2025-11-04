@@ -1,4 +1,5 @@
 use clap::Parser;
+use rfortune::log::ConsoleLog;
 use rfortune::{config, loader, utils};
 
 mod cli;
@@ -8,6 +9,8 @@ use cli::{CacheAction, Cli, Commands, ConfigAction, FileAction};
 
 fn main() {
     let cli = Cli::parse();
+
+    println!();
 
     match cli.command {
         Some(Commands::Config {
@@ -36,10 +39,10 @@ fn main() {
             match loader::FortuneFile::from_file(&file_path) {
                 Ok(fortune_file) => {
                     if let Err(e) = utils::print_random(&fortune_file, &file_path) {
-                        eprintln!("Error: {e}");
+                        ConsoleLog::ko(format!("Failed to print fortune: {e}"))
                     }
                 }
-                Err(e) => eprintln!("Error loading fortune file: {e}"),
+                Err(e) => ConsoleLog::ko(format!("Error loading fortune file: {e}")),
             }
         }
     }
