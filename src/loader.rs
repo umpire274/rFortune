@@ -13,7 +13,7 @@ impl FortuneFile {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
         let path_ref = path.as_ref();
 
-        let file = match fs::File::open(&path_ref) {
+        let file = match fs::File::open(path_ref) {
             Ok(f) => f,
             Err(e) => {
                 ConsoleLog::ko(format!("Failed to open file '{}': {e}", path_ref.display()));

@@ -1,8 +1,9 @@
 use crate::log::ConsoleLog;
 use dirs::data_dir;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
+use std::{env, fs};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -134,6 +135,57 @@ pub fn migrate_old_config() -> std::io::Result<()> {
         Err(e) => {
             ConsoleLog::ko(format!("Failed to read old config.yaml: {e}"));
         }
+    }
+
+    Ok(())
+}
+
+/// Apre il file di configurazione in modifica.
+/// Se viene specificato `--editor`, usa quello; altrimenti tenta di rilevare l’editor di sistema.
+pub fn run_config_edit(editor_arg: Option<String>) -> std::io::Result<()> {
+    let path: PathBuf = get_config_path();
+
+    // Se non esiste, crealo
+    if !path.exists() {
+        ConsoleLog::warn("Configuration file not found. Creating a new one...");
+        if let Err(e) = init_config_file() {
+            ConsoleLog::ko(format!("Failed to create configuration file: {e}"))
+        }
+    }
+
+    // 1️⃣ Priorità all'argomento CLI --editor
+    let editor = if let Some(e) = editor_arg {
+        e
+    } else {
+        // 2️⃣ Poi variabili d'ambiente VISUAL o EDITOR
+        if let Ok(visual) = env::var("VISUAL") {
+            visual
+        } else if let Ok(editor) = env::var("EDITOR") {
+            editor
+        } else {
+            // 3️⃣ Fallback per piattaforma
+            if cfg!(target_os = "windows") {
+                "notepad".to_string()
+            } else {
+                "nano".to_string()
+            }
+        }
+    };
+
+    ConsoleLog::info(format!(
+        "Opening configuration file with editor: {}",
+        editor
+    ));
+
+    // 4️⃣ Avvia l’editor
+    let status = Command::new(&editor)
+        .arg(path.to_string_lossy().to_string())
+        .status();
+
+    match status {
+        Ok(s) if s.success() => ConsoleLog::ok("Configuration file closed successfully."),
+        Ok(_) => ConsoleLog::warn("Editor exited with a non-zero status code."),
+        Err(e) => ConsoleLog::ko(format!("Failed to launch editor '{}': {e}", editor)),
     }
 
     Ok(())

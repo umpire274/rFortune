@@ -21,3 +21,10 @@ pub fn run_cache_clear() {
         ConsoleLog::ko(format!("Error clearing cache: {e}"));
     }
 }
+
+pub(crate) fn run_config_edit(editor: Option<String>) {
+    ConsoleLog::info("Clearing cache directory...");
+    if let Err(e) = config::run_config_edit(editor) {
+        ConsoleLog::ko(format!("Error opening config in editor: {e}"));
+    }
+}
