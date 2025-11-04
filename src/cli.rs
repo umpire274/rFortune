@@ -12,11 +12,18 @@ must be separated by a line containing only the '%' character.\n\n\
 You can specify a custom fortune file with `--file`, or manage configuration, \
 fortune files, and cache using subcommands:\n\n  \
 • `config init`   Create a configuration file with default options.\n  \
+• `config edit`   Edit the configuration file using the system or a chosen editor.\n  \
 • `file init`     Create a sample default fortune file (rfortune.dat).\n  \
 • `cache clear`   Remove all cached last-used fortunes.\n\n\
 This makes it easy to test, customize and extend your fortune collections \
 while preserving the spirit of the original UNIX command.",
-    after_help = "EXAMPLES:\n  rfortune\n      Print a random fortune from the default file (rfortune.dat).\n\n  rfortune --file ~/fortunes/misc\n      Print a random fortune from the file ~/fortunes/misc.\n\n  rfortune config init\n      Create a default configuration file in the user data directory.\n\n  rfortune file init\n      Create a sample fortune file (rfortune.dat) in the user data directory.\n\n  rfortune cache clear\n      Remove all cached last-used fortunes."
+    after_help = "EXAMPLES:\n  rfortune\n      Print a random fortune from the default file (rfortune.dat).\n\n  \
+  rfortune --file ~/fortunes/misc\n      Print a random fortune from the file ~/fortunes/misc.\n\n  \
+  rfortune config init\n      Create a default configuration file in the user data directory.\n\n  \
+  rfortune config edit\n      Open the configuration file in your default system editor.\n\n  \
+  rfortune config edit --editor vi\n      Open the configuration file with a specific editor.\n\n  \
+  rfortune file init\n      Create a sample fortune file (rfortune.dat) in the user data directory.\n\n  \
+  rfortune cache clear\n      Remove all cached last-used fortunes."
 )]
 pub struct Cli {
     /// Fortune file to use instead of the default (rfortune.dat)
@@ -50,6 +57,13 @@ pub enum Commands {
 pub enum ConfigAction {
     /// Initialize the configuration file
     Init,
+
+    /// Edit the configuration file with the system or custom editor
+    Edit {
+        /// Specify a custom editor name or path
+        #[arg(short, long)]
+        editor: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

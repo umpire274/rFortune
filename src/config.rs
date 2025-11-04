@@ -1,7 +1,9 @@
+use crate::log::ConsoleLog;
 use dirs::data_dir;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
+use std::{env, fs};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -24,7 +26,7 @@ pub(crate) fn app_dir() -> PathBuf {
 
 pub fn get_config_path() -> PathBuf {
     let mut p = app_dir();
-    p.push("config.yaml");
+    p.push("rfortune.conf");
     p
 }
 
@@ -40,9 +42,18 @@ pub fn init_config_file() -> std::io::Result<()> {
     let dir = app_dir();
     fs::create_dir_all(&dir)?;
 
+    if let Err(e) = migrate_old_config() {
+        ConsoleLog::warn(format!("Migration warning: {e}"));
+    }
+
     let path = get_config_path();
     if path.exists() {
-        return Ok(()); // non sovrascrivere
+        ConsoleLog::info("Configuration file already exists, skipping.");
+        return Ok(());
+    }
+
+    if let Err(e) = init_default_file() {
+        ConsoleLog::ko(format!("Error initializing fortune file: {e}"));
     }
 
     let cfg = Config {
@@ -51,7 +62,10 @@ pub fn init_config_file() -> std::io::Result<()> {
         use_cache: Some(true),
     };
     let yaml = serde_yaml::to_string(&cfg).expect("Failed to serialize config");
-    fs::write(path, yaml)
+    fs::write(path, yaml)?;
+
+    ConsoleLog::ok("Configuration file successfully created.");
+    Ok(())
 }
 
 /// Crea un file fortune di esempio (rfortune.dat) se assente
@@ -80,4 +94,99 @@ pub fn load_config() -> Option<Config> {
     let path = get_config_path();
     let content = fs::read_to_string(path).ok()?;
     serde_yaml::from_str(&content).ok()
+}
+
+/// Tenta di migrare una vecchia configurazione `config.yaml` a `rfortune.conf`
+pub fn migrate_old_config() -> std::io::Result<()> {
+    let dir = app_dir();
+    let old_path = dir.join("config.yaml");
+    let new_path = get_config_path();
+
+    // Se non c'è un vecchio file o esiste già il nuovo, non fare nulla
+    if !old_path.exists() || new_path.exists() {
+        return Ok(());
+    }
+
+    ConsoleLog::info("Old configuration file detected — attempting migration…");
+
+    // Legge e prova a deserializzare il vecchio file
+    match fs::read_to_string(&old_path) {
+        Ok(content) => match serde_yaml::from_str::<Config>(&content) {
+            Ok(cfg) => {
+                // Serializza e salva nel nuovo formato
+                let yaml =
+                    serde_yaml::to_string(&cfg).expect("Failed to serialize migrated config");
+                fs::write(&new_path, yaml)?;
+
+                // Rinomina il vecchio file come backup
+                let backup = dir.join("config.yaml.bak");
+                fs::rename(&old_path, &backup)?;
+
+                ConsoleLog::ok(format!(
+                    "Configuration migrated successfully → {:?}",
+                    new_path
+                ));
+                ConsoleLog::info(format!("Backup saved as {:?}", backup));
+            }
+            Err(e) => {
+                ConsoleLog::ko(format!("Failed to parse old config.yaml: {e}"));
+            }
+        },
+        Err(e) => {
+            ConsoleLog::ko(format!("Failed to read old config.yaml: {e}"));
+        }
+    }
+
+    Ok(())
+}
+
+/// Apre il file di configurazione in modifica.
+/// Se viene specificato `--editor`, usa quello; altrimenti tenta di rilevare l’editor di sistema.
+pub fn run_config_edit(editor_arg: Option<String>) -> std::io::Result<()> {
+    let path: PathBuf = get_config_path();
+
+    // Se non esiste, crealo
+    if !path.exists() {
+        ConsoleLog::warn("Configuration file not found. Creating a new one...");
+        if let Err(e) = init_config_file() {
+            ConsoleLog::ko(format!("Failed to create configuration file: {e}"))
+        }
+    }
+
+    // 1️⃣ Priorità all'argomento CLI --editor
+    let editor = if let Some(e) = editor_arg {
+        e
+    } else {
+        // 2️⃣ Poi variabili d'ambiente VISUAL o EDITOR
+        if let Ok(visual) = env::var("VISUAL") {
+            visual
+        } else if let Ok(editor) = env::var("EDITOR") {
+            editor
+        } else {
+            // 3️⃣ Fallback per piattaforma
+            if cfg!(target_os = "windows") {
+                "notepad".to_string()
+            } else {
+                "nano".to_string()
+            }
+        }
+    };
+
+    ConsoleLog::info(format!(
+        "Opening configuration file with editor: {}",
+        editor
+    ));
+
+    // 4️⃣ Avvia l’editor
+    let status = Command::new(&editor)
+        .arg(path.to_string_lossy().to_string())
+        .status();
+
+    match status {
+        Ok(s) if s.success() => ConsoleLog::ok("Configuration file closed successfully."),
+        Ok(_) => ConsoleLog::warn("Editor exited with a non-zero status code."),
+        Err(e) => ConsoleLog::ko(format!("Failed to launch editor '{}': {e}", editor)),
+    }
+
+    Ok(())
 }

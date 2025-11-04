@@ -1,44 +1,50 @@
 use crate::config;
 use crate::loader::FortuneFile;
+use crate::log::ConsoleLog;
 use rand::seq::IndexedRandom;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+/// Estrae una citazione casuale dalla lista
 pub fn random_quote(quotes: &[String]) -> &str {
     let mut rng = rand::rng();
     quotes.choose(&mut rng).map(|s| s.as_str()).unwrap()
 }
 
+/// Stampa una citazione casuale dal file fortune
 pub fn print_random(fortune_file: &FortuneFile, file_path: &Path) -> Result<(), String> {
-    // esempio: recupera la citazione casuale
-    let quote = if fortune_file.quotes.is_empty() {
+    if fortune_file.quotes.is_empty() {
+        ConsoleLog::ko("No quotes found in the fortune file.");
         return Err("No quotes found in the file.".to_string());
-    } else {
-        random_nonrepeating(&fortune_file.quotes, None)
-    };
+    }
 
-    // eventuale stampa titolo se presente
+    // Se possibile evita di ripetere l’ultima citazione
+    let quote = random_nonrepeating(&fortune_file.quotes, None);
+
     if let Some(title) = &fortune_file.title {
         println!("({title})");
     }
 
-    // stampa il contenuto
-    println!("{}", quote);
+    // Stampa il contenuto vero e proprio
+    println!("{quote}");
 
-    // qui salvi anche in cache se necessario
+    // Aggiornamento cache
     if let Err(e) = save_last_cache(file_path, quote) {
-        eprintln!("Warning: could not update cache: {e}");
+        ConsoleLog::warn(format!("Could not update cache: {e}"));
     }
 
     Ok(())
 }
 
+/// Percorso del file cache per un determinato fortune file
 pub fn get_cache_path(dat_path: &Path) -> PathBuf {
     let mut base = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
     base.push("rfortune");
     base.push("cache");
-    fs::create_dir_all(&base).ok();
+    if let Err(e) = fs::create_dir_all(&base) {
+        ConsoleLog::warn(format!("Unable to create cache directory: {e}"));
+    }
 
     let name = dat_path
         .file_stem()
@@ -51,14 +57,28 @@ pub fn get_cache_path(dat_path: &Path) -> PathBuf {
     base
 }
 
+/// Legge l’ultima citazione salvata in cache (se esiste)
 pub fn read_last_cache(path: &Path) -> Option<String> {
-    fs::read_to_string(path).ok()
+    match fs::read_to_string(path) {
+        Ok(content) => {
+            ConsoleLog::info(format!("Loaded cached quote from '{}'.", path.display()));
+            Some(content)
+        }
+        Err(_) => None,
+    }
 }
 
+/// Scrive l’ultima citazione nella cache
 pub fn write_last_cache(path: &Path, quote: &str) {
-    let _ = fs::write(path, quote);
+    if let Err(e) = fs::write(path, quote) {
+        ConsoleLog::warn(format!(
+            "Failed to write cache file '{}': {e}",
+            path.display()
+        ));
+    }
 }
 
+/// Restituisce una citazione casuale diversa dalla precedente (se possibile)
 pub fn random_nonrepeating<'a>(quotes: &'a [String], last: Option<&str>) -> &'a str {
     let mut rng = rand::rng();
     let filtered: Vec<&String> = quotes.iter().filter(|q| Some(q.as_str()) != last).collect();
@@ -70,7 +90,7 @@ pub fn random_nonrepeating<'a>(quotes: &'a [String], last: Option<&str>) -> &'a 
     }
 }
 
-/// Directory della cache: .../rfortune/cache
+/// Directory base della cache
 fn get_cache_dir() -> PathBuf {
     let mut p = config::app_dir();
     p.push("rfortune");
@@ -83,6 +103,9 @@ pub fn clear_cache_dir() -> std::io::Result<()> {
     let dir = get_cache_dir();
     if dir.exists() {
         fs::remove_dir_all(&dir)?;
+        ConsoleLog::ok(format!("Cache directory cleared: {}", dir.display()));
+    } else {
+        ConsoleLog::info("Cache directory is already empty.");
     }
     Ok(())
 }
@@ -93,7 +116,9 @@ pub fn save_last_cache(file_path: &Path, quote: &str) -> std::io::Result<()> {
     if let Some(parent) = cache_path.parent() {
         fs::create_dir_all(parent)?; // assicura che la cartella esista
     }
-    let mut f = fs::File::create(cache_path)?;
+
+    let mut f = fs::File::create(&cache_path)?;
     f.write_all(quote.as_bytes())?;
+
     Ok(())
 }

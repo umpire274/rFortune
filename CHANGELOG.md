@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.5.2] - 2025-11-04
+
+### Added
+
+- New **`ConsoleLog`** utility for rich, colorized console output with Unicode symbols:
+    - ℹ `info()` – Informational messages
+    - ✅ `ok()` – Successful operations
+    - ⚠️ `warn()` – Warnings and recoverable issues
+    - ❌ `ko()` – Errors and critical failures
+- Integrated `ConsoleLog` throughout configuration, cache, and file management commands for consistent CLI feedback.
+- New subcommand **`config edit`** for editing the configuration file directly from the terminal:
+    - `rfortune config edit` → opens `rfortune.conf` using the system’s default text editor.
+    - `rfortune config edit --editor <name|path>` → opens it with a specific editor (e.g. `vi`, `nano`, `code`).
+- Automatic editor detection logic:
+    - Checks `$VISUAL` and `$EDITOR` environment variables.
+    - Falls back to **`nano`** on macOS/Linux and **`notepad`** on Windows.
+- Integrated colored console messages (`ConsoleLog`) for clear feedback during editing.
+
+### Changed
+
+- Configuration filename renamed from **`config.yaml`** → **`rfortune.conf`** for better clarity and platform
+  consistency.
+- Updated initialization logic to automatically migrate existing `config.yaml` to the new format (backup saved as
+  `config.yaml.bak`).
+- Unified editor behavior across platforms for a consistent CLI experience.
+- Improved user feedback when creating or editing the configuration file.
+
+### Fixed
+
+- Improved user feedback during `config init`, `file init`, and `cache clear` operations to prevent duplicate or missing
+  log messages.
+
+---
+
 ## [0.5.1] - 2025-10-27
 
 ### Added
