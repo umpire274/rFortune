@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.5.2] - 2025-11-04
+
+### Changed
+
+- Configuration filename renamed from **`config.yaml`** → **`rfortune.conf`** for better clarity and platform
+  consistency.
+- Updated initialization logic to automatically migrate existing `config.yaml` to the new format (backup saved as
+  `config.yaml.bak`).
+
+### Added
+
+- New **`ConsoleLog`** utility for rich, colorized console output with Unicode symbols:
+    - ℹ `info()` – Informational messages
+    - ✅ `ok()` – Successful operations
+    - ⚠️ `warn()` – Warnings and recoverable issues
+    - ❌ `ko()` – Errors and critical failures
+- Integrated `ConsoleLog` throughout configuration, cache, and file management commands for consistent CLI feedback.
+
+### Fixed
+
+- Improved user feedback during `config init`, `file init`, and `cache clear` operations to prevent duplicate or missing
+  log messages.
+
+---
+
 ## [0.5.1] - 2025-10-27
 
 ### Added
