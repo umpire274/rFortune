@@ -13,6 +13,25 @@ scripting, or just a bit of inspiration.
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20Intel%20%7C%20macOS%20Apple%20Silicon-blue)](https://github.com/umpire274/rFortune/releases)
 [![GitHub release](https://img.shields.io/github/v/release/umpire274/rfortune)](https://github.com/umpire274/rfortune/releases/latest)
 
+---
+
+## ✨ New in v0.5.2
+
+### 🆕 Configuration system improvements
+
+- Configuration filename renamed from config.yaml → rfortune.conf for better clarity and portability.
+- Automatic migration from legacy config.yaml to the new format — the old file is safely backed up as config.yaml.bak.
+- Added the new subcommand config edit:
+    - rfortune config edit → opens rfortune.conf using the system’s default text editor.
+    - rfortune config edit --editor <name|path> → opens it with a specific editor (e.g. vi, nano, code).
+- Automatic detection of preferred editors via $VISUAL and $EDITOR environment variables.
+- Default fallback editors are nano (macOS/Linux) and notepad (Windows).
+
+### 🎨 Improved CLI feedback
+
+- Introduced the new ConsoleLog class for rich, colored terminal output:
+    - ℹ Info, ✅ Success, ⚠️ Warning, ❌ Error
+- Unified message style and improved feedback during configuration, cache, and fortune file operations.
 
 ---
 
@@ -128,30 +147,37 @@ Running `rfortune` without subcommands prints a random fortune from the default 
 
 ## 🧩 Options & Subcommands
 
-| Command / Option      | Description                                           |
-|-----------------------|-------------------------------------------------------|
-| `-f`, `--file <PATH>` | Use a custom fortune file instead of the default      |
-| `config init`         | Create the configuration file with default options    |
-| `file init`           | Create a sample default fortune file (`rfortune.dat`) |
-| `cache clear`         | Remove all cached last-used fortunes                  |
-| `-V`, `--version`     | Show version information                              |
-| `-h`, `--help`        | Show help message                                     |
+| Command / Option             | Description                                                               |
+|------------------------------|---------------------------------------------------------------------------|
+| `-f`, `--file <PATH>`        | Use a custom fortune file instead of the default                          |
+| `config init`                | Create the configuration file with default options                        |
+| `config edit [--editor <E>]` | Open the configuration file in the system’s default or a specified editor |
+| `file init`                  | Create a sample default fortune file (`rfortune.dat`)                     |
+| `cache clear`                | Remove all cached last-used fortunes                                      |
+| `-V`, `--version`            | Show version information                                                  |
+| `-h`, `--help`               | Show help message                                                         |
 
 ---
 
-## 🧪 Examples
+## 💡 Examples
 
-```sh
-# Print a random fortune from the default file
+```bash
+# Print a random fortune from the default file (rfortune.dat)
 rfortune
 
 # Print a random fortune from a specific file
 rfortune --file ~/fortunes/misc
 
-# Initialize configuration file
+# Create the default configuration file in the user data directory
 rfortune config init
 
-# Create a sample default fortune file
+# Open the configuration file in the system’s default text editor
+rfortune config edit
+
+# Open the configuration file with a specific editor (e.g. vi, nano, code)
+rfortune config edit --editor vi
+
+# Create a sample default fortune file (rfortune.dat)
 rfortune file init
 
 # Clear all cached last-used fortunes
