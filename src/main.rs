@@ -1,5 +1,6 @@
 use clap::Parser;
 use rfortune::log::ConsoleLog;
+use rfortune::utils::ensure_app_initialized;
 use rfortune::{config, loader, utils};
 
 mod cli;
@@ -11,6 +12,11 @@ fn main() {
     let cli = Cli::parse();
 
     println!();
+
+    if let Err(e) = ensure_app_initialized() {
+        ConsoleLog::ko(format!("Initialization error: {e}"));
+        return;
+    }
 
     match cli.command {
         // ---------------- CONFIG ----------------
