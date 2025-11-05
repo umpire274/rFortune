@@ -2,9 +2,9 @@ use crate::config;
 use crate::loader::FortuneFile;
 use crate::log::ConsoleLog;
 use rand::seq::IndexedRandom;
-use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 /// Estrae una citazione casuale dalla lista
 pub fn random_quote(quotes: &[String]) -> &str {
@@ -99,7 +99,7 @@ fn get_cache_dir() -> PathBuf {
 }
 
 /// Svuota completamente la cache
-pub fn clear_cache_dir() -> std::io::Result<()> {
+pub fn clear_cache_dir() -> io::Result<()> {
     let dir = get_cache_dir();
     if dir.exists() {
         fs::remove_dir_all(&dir)?;
@@ -111,7 +111,7 @@ pub fn clear_cache_dir() -> std::io::Result<()> {
 }
 
 /// Salva l’ultima citazione usata in un file di cache
-pub fn save_last_cache(file_path: &Path, quote: &str) -> std::io::Result<()> {
+pub fn save_last_cache(file_path: &Path, quote: &str) -> io::Result<()> {
     let cache_path = get_cache_path(file_path);
     if let Some(parent) = cache_path.parent() {
         fs::create_dir_all(parent)?; // assicura che la cartella esista
@@ -120,5 +120,36 @@ pub fn save_last_cache(file_path: &Path, quote: &str) -> std::io::Result<()> {
     let mut f = fs::File::create(&cache_path)?;
     f.write_all(quote.as_bytes())?;
 
+    Ok(())
+}
+
+pub fn ensure_app_initialized() -> io::Result<()> {
+    let dir = config::app_dir();
+
+    if dir.exists() {
+        return Ok(()); // tutto a posto
+    }
+
+    // Se il processo è interattivo (TTY), chiedi conferma
+    if atty::is(atty::Stream::Stdin) {
+        print!("Configuration directory not found. Initialize rFortune now? [Y/n]: ");
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let answer = input.trim().to_lowercase();
+
+        if answer == "n" || answer == "no" {
+            ConsoleLog::warn("Initialization aborted by user.");
+            std::process::exit(0);
+        }
+    } else {
+        ConsoleLog::info("Configuration directory missing — initializing automatically.");
+    }
+
+    // Esegui l’inizializzazione completa
+    ConsoleLog::info("Initializing rFortune environment...");
+    config::init_config_file()?;
+    ConsoleLog::ok("rFortune initialized successfully.");
     Ok(())
 }

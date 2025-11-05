@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.3] - 2025-11-05
+
+### Fixed
+
+- Added interactive check when rFortune is launched without an existing configuration directory:
+    - If run in an interactive terminal, the user is asked to confirm initialization (`Initialize rFortune now? [Y/n]`).
+    - If run in a non-interactive context (script, CI, etc.), initialization proceeds automatically.
+- Prevents unintended directory creation and improves transparency during the first launch.
+
+### Changed
+
+- Initialization flow is now clearer and reports actions through `ConsoleLog` messages.
+
+---
+
 ## [0.5.2] - 2025-11-04
 
 ### Added

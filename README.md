@@ -15,23 +15,20 @@ scripting, or just a bit of inspiration.
 
 ---
 
-## ✨ New in v0.5.2
+### ✨ New in v0.5.3
 
-### 🆕 Configuration system improvements
+**🧭 Smarter first-time initialization**
 
-- Configuration filename renamed from config.yaml → rfortune.conf for better clarity and portability.
-- Automatic migration from legacy config.yaml to the new format — the old file is safely backed up as config.yaml.bak.
-- Added the new subcommand config edit:
-    - rfortune config edit → opens rfortune.conf using the system’s default text editor.
-    - rfortune config edit --editor <name|path> → opens it with a specific editor (e.g. vi, nano, code).
-- Automatic detection of preferred editors via $VISUAL and $EDITOR environment variables.
-- Default fallback editors are nano (macOS/Linux) and notepad (Windows).
+- Added an interactive prompt when `rfortune` is launched for the first time and no configuration directory exists.
+    - In interactive terminals, users are asked: `Initialize rFortune now? [Y/n]`.
+    - In non-interactive contexts (scripts, CI, etc.), initialization happens automatically.
+- Prevents unintended directory creation and improves transparency during first setup.
+- Initialization progress and results are displayed using `ConsoleLog` messages for consistency.
 
-### 🎨 Improved CLI feedback
+**⚙️ Improved startup behavior**
 
-- Introduced the new ConsoleLog class for rich, colored terminal output:
-    - ℹ Info, ✅ Success, ⚠️ Warning, ❌ Error
-- Unified message style and improved feedback during configuration, cache, and fortune file operations.
+- The application now clearly reports which configuration directory is being used (`dirs::data_dir()` path).
+- Overall initialization flow refined for clarity and better UX.
 
 ---
 
@@ -142,6 +139,15 @@ rfortune <SUBCOMMAND>
 ```
 
 Running `rfortune` without subcommands prints a random fortune from the default file (`rfortune.dat`).
+
+---
+
+## ⚙️ First-time setup
+
+When `rfortune` is launched for the first time and no configuration directory exists,  
+the application will ask whether to initialize its environment (creating the default  
+configuration and fortune files).  
+In non-interactive contexts, initialization happens automatically.
 
 ---
 
