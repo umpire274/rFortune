@@ -19,7 +19,7 @@ include = [
 ]
 
 [build-dependencies]
-winresource = "0.1.26"
+winresource = "0.1.27"
 
 [package.metadata.winresource]
 Icon = "res/rfortune.ico"
