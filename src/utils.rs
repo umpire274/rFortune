@@ -163,7 +163,6 @@ pub fn clear_cache_dir() -> io::Result<()> {
 pub fn save_last_cache(path: &Path, quote: &str) -> Result<(), String> {
     let store = cache_store_path();
 
-    // carica mappa esistente o crea nuova
     let mut map: HashMap<String, String> = if store.exists() {
         serde_json::from_str(&fs::read_to_string(&store).map_err(|e| format!("read cache: {e}"))?)
             .unwrap_or_default()
