@@ -164,6 +164,7 @@ pub fn clear_cache_dir() -> io::Result<()> {
 /// Salva l’ultima citazione usata in un file di cache
 pub fn save_last_cache(path: &Path, quote: &str) -> Result<(), String> {
     let store = cache_store_path();
+    ensure_cache_dir(&store)?; // ✅ nuova funzione riutilizzata
 
     let mut map: HashMap<String, String> = if store.exists() {
         serde_json::from_str(&fs::read_to_string(&store).map_err(|e| format!("read cache: {e}"))?)
@@ -174,11 +175,9 @@ pub fn save_last_cache(path: &Path, quote: &str) -> Result<(), String> {
 
     map.insert(canonical_key(path), quote.to_string());
 
-    fs::write(
-        &store,
-        serde_json::to_string_pretty(&map).map_err(|e| format!("serialize cache: {e}"))?,
-    )
-    .map_err(|e| format!("write cache: {e}"))
+    let json = serde_json::to_string_pretty(&map).map_err(|e| format!("serialize cache: {e}"))?;
+
+    fs::write(&store, json).map_err(|e| format!("write cache: {e}"))
 }
 
 pub fn ensure_app_initialized() -> io::Result<()> {
@@ -249,8 +248,17 @@ pub fn resolve_fortune_sources(cli_files: Option<Vec<String>>, config: &Config) 
     vec![]
 }
 
+/// Ensure that the parent directory for the given cache store path exists.
+/// Returns an error message if creation fails.
+fn ensure_cache_dir(store: &Path) -> Result<(), String> {
+    if let Some(parent) = store.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("create cache dir: {e}"))?;
+    }
+    Ok(())
+}
+
 /// Percorso del file JSON di cache: ~/.local/share/rfortune/cache/last_quotes.json
-fn cache_store_path() -> std::path::PathBuf {
+fn cache_store_path() -> PathBuf {
     let mut p = config::app_dir();
     p.push("cache");
     let _ = fs::create_dir_all(&p);
@@ -269,7 +277,21 @@ fn canonical_key(path: &Path) -> String {
 /// Ritorna Ok(quote) se presente, Err(...) se assente o in caso di problema non critico.
 pub fn load_last_cache(path: &Path) -> Result<String, String> {
     let store = cache_store_path();
-    let data = fs::read_to_string(&store).map_err(|_| "no cache".to_string())?;
+
+    // ✅ garantisci che la directory cache esista
+    if let Some(parent) = store.parent()
+        && let Err(e) = fs::create_dir_all(parent)
+    {
+        return Err(format!("failed to create cache directory: {e}"));
+    }
+
+    // ✅ se il file non esiste ancora → ritorna "nessuna cache" ma senza errore fatale
+    if !store.exists() {
+        return Err("no cache".to_string());
+    }
+
+    // ✅ carica in sicurezza la cache JSON (se danneggiata → mappa vuota)
+    let data = fs::read_to_string(&store).unwrap_or_default();
     let map: HashMap<String, String> = serde_json::from_str(&data).unwrap_or_default();
 
     map.get(&canonical_key(path))
@@ -282,8 +304,8 @@ pub fn load_last_cache(path: &Path) -> Result<String, String> {
 #[allow(dead_code)]
 pub fn save_last_cache_json(path: &Path, quote: &str) -> Result<(), String> {
     let store = cache_store_path();
+    ensure_cache_dir(&store)?; // ✅ nuova funzione riutilizzata
 
-    // carica mappa esistente (se c'è)
     let mut map: HashMap<String, String> = if store.exists() {
         let s = fs::read_to_string(&store).map_err(|e| format!("read cache: {e}"))?;
         serde_json::from_str(&s).unwrap_or_default()
@@ -291,9 +313,9 @@ pub fn save_last_cache_json(path: &Path, quote: &str) -> Result<(), String> {
         HashMap::new()
     };
 
-    let key = canonical_key(path);
-    map.insert(key, quote.to_string());
+    map.insert(canonical_key(path), quote.to_string());
 
     let json = serde_json::to_string_pretty(&map).map_err(|e| format!("serialize cache: {e}"))?;
+
     fs::write(&store, json).map_err(|e| format!("write cache: {e}"))
 }
