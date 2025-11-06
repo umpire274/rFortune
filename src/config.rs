@@ -1,4 +1,5 @@
 use crate::log::ConsoleLog;
+use dirs::data_dir;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
@@ -29,15 +30,33 @@ pub(crate) fn app_dir() -> PathBuf {
         return dir.clone();
     }
 
-    // percorso runtime reale
-    let mut base = dirs::data_dir().unwrap_or_else(|| {
-        let mut p = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        p.push(".rfortune");
-        p
-    });
+    // 1️⃣ Caso normale: dirs::data_dir() restituisce un path valido
+    if let Some(mut base) = data_dir() {
+        base.push("rfortune");
+        return base;
+    }
 
-    base.push("rfortune");
-    base
+    // 2️⃣ Fallback: se data_dir() == None, prova con $HOME
+    if let Some(home) = dirs::home_dir() {
+        let mut base = home;
+        #[cfg(target_os = "macos")]
+        {
+            base.push("Library");
+            base.push("Application Support");
+        }
+        #[cfg(target_os = "linux")]
+        {
+            base.push(".local");
+            base.push("share");
+        }
+        base.push("rfortune");
+        return base;
+    }
+
+    // 3️⃣ Ultimo fallback (raro): directory corrente
+    let mut p = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    p.push(".rfortune");
+    p
 }
 
 pub fn get_config_path() -> PathBuf {

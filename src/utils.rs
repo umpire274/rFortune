@@ -88,6 +88,8 @@ pub fn get_cache_path(dat_path: &Path) -> PathBuf {
     let mut base = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
     base.push("rfortune");
     base.push("cache");
+
+    // ✅ garantisce che la directory esista sempre
     if let Err(e) = fs::create_dir_all(&base) {
         ConsoleLog::warn(format!("Unable to create cache directory: {e}"));
     }
