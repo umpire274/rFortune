@@ -1,8 +1,8 @@
 use crate::log::ConsoleLog;
-use dirs::data_dir;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::OnceLock;
 use std::{env, fs};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -14,15 +14,29 @@ pub struct Config {
     pub fortune_files: Vec<String>,
 }
 
+static APP_DIR_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
+
+/// Usata nei test per forzare una directory sandbox
+pub fn set_app_dir_for_tests(dir: PathBuf) {
+    let _ = APP_DIR_OVERRIDE.set(dir);
+}
+
+/// Restituisce la directory di configurazione dell'app.
+/// Durante i test, se `set_app_dir_for_tests()` è stato chiamato,
+/// allora viene utilizzata la sandbox invece della directory reale.
 pub(crate) fn app_dir() -> PathBuf {
-    let mut base = data_dir().unwrap_or_else(|| {
-        // fallback molto conservativo
-        let mut p = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    if let Some(dir) = APP_DIR_OVERRIDE.get() {
+        return dir.clone();
+    }
+
+    // percorso runtime reale
+    let mut base = dirs::data_dir().unwrap_or_else(|| {
+        let mut p = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         p.push(".rfortune");
         p
     });
+
     base.push("rfortune");
-    // NB: non creiamo qui la directory per non sorprendere l'utente in chiamate read-only
     base
 }
 
@@ -98,14 +112,13 @@ pub fn load_config() -> Option<Config> {
     let content = fs::read_to_string(&path).ok()?;
     let mut cfg: Config = serde_yaml::from_str(&content).ok()?;
 
-    // ✅ MIGRATION AUTOMATICA
+    // ✅ MIGRAZIONE PURA: default_file → fortune_files
     if cfg.fortune_files.is_empty()
         && let Some(df) = &cfg.default_file
     {
         cfg.fortune_files = vec![df.clone()];
+        let _ = cfg.save();
     }
-
-    let _ = cfg.save(); // ignoriamo eventuali errori non critici
 
     Some(cfg)
 }
