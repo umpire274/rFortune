@@ -1,7 +1,9 @@
 use clap::Parser;
+use rfortune::config::Config;
 use rfortune::log::ConsoleLog;
 use rfortune::utils::ensure_app_initialized;
-use rfortune::{config, loader, utils};
+use rfortune::{config, utils};
+use std::path::Path;
 
 mod cli;
 mod commands;
@@ -17,6 +19,17 @@ fn main() {
         ConsoleLog::ko(format!("Initialization error: {e}"));
         return;
     }
+
+    // ✅ CARICHIAMO LA CONFIG UNA VOLTA QUI
+    let config = config::load_config().unwrap_or_else(|| {
+        ConsoleLog::warn("No configuration file found. Using defaults.");
+        Config {
+            default_file: Some(config::get_default_path().to_string_lossy().to_string()),
+            print_title: Some(true),
+            use_cache: Some(true),
+            fortune_files: vec![],
+        }
+    });
 
     match cli.command {
         // ---------------- CONFIG ----------------
@@ -45,19 +58,20 @@ fn main() {
 
         // ---------------- DEFAULT: print random fortune ----------------
         None => {
-            let file_path = if let Some(path) = cli.file {
-                std::path::PathBuf::from(path)
-            } else {
-                config::get_default_path()
-            };
+            // 1. Risolve la PRIORITÀ delle sorgenti
+            let sources = utils::resolve_fortune_sources(cli.files.clone(), &config);
 
-            match loader::FortuneFile::from_file(&file_path) {
-                Ok(fortune_file) => {
-                    if let Err(e) = utils::print_random(&fortune_file, &file_path) {
-                        ConsoleLog::ko(format!("Failed to print fortune: {e}"));
-                    }
-                }
-                Err(e) => ConsoleLog::ko(format!("Error loading fortune file: {e}")),
+            if sources.is_empty() {
+                ConsoleLog::ko("No fortune sources configured or provided.");
+                return;
+            }
+
+            // 2. Convertiamo in Path
+            let paths: Vec<&Path> = sources.iter().map(Path::new).collect();
+
+            // 3. Stampa citazione casuale da più file
+            if let Err(e) = utils::print_random_from_files(&paths) {
+                ConsoleLog::ko(format!("Failed to print fortune: {e}"));
             }
         }
     }

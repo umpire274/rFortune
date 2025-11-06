@@ -1,7 +1,9 @@
 use crate::config;
+use crate::config::Config;
 use crate::loader::FortuneFile;
 use crate::log::ConsoleLog;
 use rand::seq::IndexedRandom;
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -13,24 +15,68 @@ pub fn random_quote(quotes: &[String]) -> &str {
 }
 
 /// Stampa una citazione casuale dal file fortune
-pub fn print_random(fortune_file: &FortuneFile, file_path: &Path) -> Result<(), String> {
-    if fortune_file.quotes.is_empty() {
-        ConsoleLog::ko("No quotes found in the fortune file.");
-        return Err("No quotes found in the file.".to_string());
+pub fn print_random_from_files(paths: &[&Path]) -> Result<(), String> {
+    let mut all_quotes: Vec<String> = Vec::new();
+    let mut origin_by_index: Vec<PathBuf> = Vec::new();
+
+    // 1) Carichiamo tutte le citazioni e tracciamo il file di origine
+    for path in paths {
+        match FortuneFile::from_file(path) {
+            Ok(f) => {
+                for q in &f.quotes {
+                    all_quotes.push(q.clone());
+                    origin_by_index.push(path.to_path_buf());
+                }
+            }
+            Err(e) => {
+                ConsoleLog::warn(format!("Could not load file {}: {e}", path.display()));
+            }
+        }
     }
 
-    // Se possibile evita di ripetere l’ultima citazione
-    let quote = random_nonrepeating(&fortune_file.quotes, None);
-
-    if let Some(title) = &fortune_file.title {
-        println!("({title})");
+    if all_quotes.is_empty() {
+        ConsoleLog::ko("No quotes found in any of the fortune files.");
+        return Err("No quotes found.".into());
     }
 
-    // Stampa il contenuto vero e proprio
+    // 2) Proviamo a evitare ripetizioni dal *medesimo* file
+    // Carichiamo ultima citazione SOLO se deriva da uno dei file in uso
+    let mut last_quote = None;
+
+    for p in paths {
+        if let Ok(q) = load_last_cache(p) {
+            last_quote = Some(q);
+            break; // basta la prima cache utile
+        }
+    }
+
+    let quote = if let Some(last) = last_quote {
+        // Rimuoviamo tutte le citazioni identiche all’ultima
+        let filtered: Vec<&String> = all_quotes.iter().filter(|q| *q != &last).collect();
+
+        if filtered.is_empty() {
+            // Se tutte erano uguali (caso rarissimo), scegliamo pure
+            all_quotes.choose(&mut rand::rng()).unwrap().clone()
+        } else {
+            filtered.choose(&mut rand::rng()).unwrap().to_string()
+        }
+    } else {
+        // Nessuna citazione precedente → scelta libera
+        all_quotes.choose(&mut rand::rng()).unwrap().clone()
+    };
+
+    // 3) Identifichiamo il file da cui la citazione proviene
+    let idx = all_quotes
+        .iter()
+        .position(|q| q == &quote)
+        .expect("internal mismatch");
+    let origin = &origin_by_index[idx];
+
+    // 4) Stampa effettiva
     println!("{quote}");
 
-    // Aggiornamento cache
-    if let Err(e) = save_last_cache(file_path, quote) {
+    // 5) Salviamo la cache SOLO per il file di origine
+    if let Err(e) = save_last_cache(origin.as_path(), &quote) {
         ConsoleLog::warn(format!("Could not update cache: {e}"));
     }
 
@@ -79,9 +125,12 @@ pub fn write_last_cache(path: &Path, quote: &str) {
 }
 
 /// Restituisce una citazione casuale diversa dalla precedente (se possibile)
-pub fn random_nonrepeating<'a>(quotes: &'a [String], last: Option<&str>) -> &'a str {
+pub fn random_nonrepeating(quotes: &[String], last: Option<String>) -> &str {
     let mut rng = rand::rng();
-    let filtered: Vec<&String> = quotes.iter().filter(|q| Some(q.as_str()) != last).collect();
+    let filtered: Vec<&String> = quotes
+        .iter()
+        .filter(|q| Some(q.as_str()) != last.as_deref())
+        .collect();
 
     if filtered.is_empty() {
         quotes.choose(&mut rng).unwrap()
@@ -111,16 +160,23 @@ pub fn clear_cache_dir() -> io::Result<()> {
 }
 
 /// Salva l’ultima citazione usata in un file di cache
-pub fn save_last_cache(file_path: &Path, quote: &str) -> io::Result<()> {
-    let cache_path = get_cache_path(file_path);
-    if let Some(parent) = cache_path.parent() {
-        fs::create_dir_all(parent)?; // assicura che la cartella esista
-    }
+pub fn save_last_cache(path: &Path, quote: &str) -> Result<(), String> {
+    let store = cache_store_path();
 
-    let mut f = fs::File::create(&cache_path)?;
-    f.write_all(quote.as_bytes())?;
+    let mut map: HashMap<String, String> = if store.exists() {
+        serde_json::from_str(&fs::read_to_string(&store).map_err(|e| format!("read cache: {e}"))?)
+            .unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
 
-    Ok(())
+    map.insert(canonical_key(path), quote.to_string());
+
+    fs::write(
+        &store,
+        serde_json::to_string_pretty(&map).map_err(|e| format!("serialize cache: {e}"))?,
+    )
+    .map_err(|e| format!("write cache: {e}"))
 }
 
 pub fn ensure_app_initialized() -> io::Result<()> {
@@ -152,4 +208,90 @@ pub fn ensure_app_initialized() -> io::Result<()> {
     config::init_config_file()?;
     ConsoleLog::ok("rFortune initialized successfully.");
     Ok(())
+}
+
+pub fn get_fortune_sources(cli_files: Option<Vec<String>>, config: &Config) -> Vec<String> {
+    if let Some(files) = cli_files
+        && !files.is_empty()
+    {
+        return files;
+    }
+
+    if !config.fortune_files.is_empty() {
+        return config.fortune_files.clone();
+    }
+
+    if let Some(df) = &config.default_file {
+        return vec![df.clone()];
+    }
+
+    // fallback hard-coded (ultima ratio)
+    vec!["/usr/local/share/rfortune/fortunes".into()]
+}
+
+pub fn resolve_fortune_sources(cli_files: Option<Vec<String>>, config: &Config) -> Vec<String> {
+    if let Some(files) = cli_files
+        && !files.is_empty()
+    {
+        return files;
+    }
+
+    if !config.fortune_files.is_empty() {
+        return config.fortune_files.clone();
+    }
+
+    if let Some(default) = &config.default_file {
+        return vec![default.clone()];
+    }
+
+    vec![]
+}
+
+/// Percorso del file JSON di cache: ~/.local/share/rfortune/cache/last_quotes.json
+fn cache_store_path() -> std::path::PathBuf {
+    let mut p = config::app_dir();
+    p.push("cache");
+    let _ = fs::create_dir_all(&p);
+    p.push("last_quotes.json");
+    p
+}
+
+fn canonical_key(path: &Path) -> String {
+    path.canonicalize()
+        .unwrap_or_else(|_| path.to_path_buf())
+        .to_string_lossy()
+        .to_string()
+}
+
+/// Carica l'ULTIMA citazione mostrata per il file `path`.
+/// Ritorna Ok(quote) se presente, Err(...) se assente o in caso di problema non critico.
+pub fn load_last_cache(path: &Path) -> Result<String, String> {
+    let store = cache_store_path();
+    let data = fs::read_to_string(&store).map_err(|_| "no cache".to_string())?;
+    let map: HashMap<String, String> = serde_json::from_str(&data).unwrap_or_default();
+
+    map.get(&canonical_key(path))
+        .cloned()
+        .ok_or_else(|| "no cache".to_string())
+}
+
+/// (Facoltativo) Versione "allineata" di save_last_cache nel caso tu voglia uniformarla
+/// al formato JSON condiviso. Se hai già una save_last_cache funzionante, puoi ignorare questa.
+#[allow(dead_code)]
+pub fn save_last_cache_json(path: &Path, quote: &str) -> Result<(), String> {
+    let store = cache_store_path();
+
+    // carica mappa esistente (se c'è)
+    let mut map: HashMap<String, String> = if store.exists() {
+        let s = fs::read_to_string(&store).map_err(|e| format!("read cache: {e}"))?;
+        serde_json::from_str(&s).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    let key = canonical_key(path);
+    map.insert(key, quote.to_string());
+
+    let json = serde_json::to_string_pretty(&map).map_err(|e| format!("serialize cache: {e}"))?;
+    fs::write(&store, json).map_err(|e| format!("write cache: {e}"))
 }
