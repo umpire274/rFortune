@@ -1,3 +1,4 @@
+use clap::ArgAction;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
@@ -27,8 +28,8 @@ while preserving the spirit of the original UNIX command.",
 )]
 pub struct Cli {
     /// Fortune file to use instead of the default (rfortune.dat)
-    #[arg(short, long)]
-    pub file: Option<String>,
+    #[arg(long = "file", value_name = "FILE", num_args = 1.., action = ArgAction::Append)]
+    pub files: Option<Vec<String>>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,

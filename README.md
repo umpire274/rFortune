@@ -192,18 +192,83 @@ rfortune cache clear
 
 ---
 
-## 📁 File Format
+### Configuration (`rfortune.conf`)
+
+Example:
+
+```yaml
+default_file: "/home/user/.local/share/rfortune/rfortune.dat"
+print_title: true
+use_cache: true
+
+# Optional: load additional quote files
+fortune_files:
+  - "/usr/local/share/rfortune/philosophy.fort"
+  - "/usr/local/share/rfortune/tech.fort"
+```
+
+Priority order:
+
+1. `--file <PATH>` CLI argument(s)
+2. `fortune_files` list in config
+3. `default_file`
+
+---
+
+### Multiple Sources Configuration
+
+You can load quotes from multiple files and rfortune will automatically
+choose one at random:
+
+```bash
+rfortune --file my_quotes.fort --file jokes.fort --file tech.fort
+```
+
+Or configure them permanently:
+
+```yaml
+fortune_files:
+  - "/path/to/my_quotes.fort"
+  - "/path/to/jokes.fort"
+```
+
+If both are present, **CLI always wins**.
+
+### Smart Quote Repetition Avoidance
+
+rfortune keeps a small cache and automatically avoids repeating
+the **same quote twice in a row**, but **only for quotes from the same file**.
+
+This keeps the output natural across multiple sources.
+
+---
+
+### Migration from older versions
+
+If your previous configuration did not contain `fortune_files`,
+rfortune will automatically migrate your config by adding it and setting:
+
+```yaml
+fortune_files:
+  - default_file
+```
+
+No manual action is required.
+
+---
+
+## 📁 Fortune File Format
 
 Each fortune must be on one or more lines separated by `%`, like so:
 
-```txt
-%
-The best way to get a good idea is to get a lot of ideas.
-%
-Do or do not. There is no try.
-%
-To iterate is human, to recurse divine.
-%
+  ```txt
+  %
+  The best way to get a good idea is to get a lot of ideas.
+  %
+  Do or do not. There is no try.
+  %
+  To iterate is human, to recurse divine.
+  %
 ```
 
 You may optionally add a title at the top of the file by starting the first line with #. The title will be printed

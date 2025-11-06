@@ -1,6 +1,6 @@
 [package]
 name = "rfortune"
-version = "0.5.3"
+version = "0.5.5"
 edition = "2024"
 authors = ["Umpire274 <umpire274@gmail.com>"]
 description = "A Rust-based clone of the classic UNIX 'fortune' command"
@@ -31,4 +31,5 @@ dirs = "6.0.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.33"
 atty = "0.2.14"
+serde_json = "1.0.145"
 

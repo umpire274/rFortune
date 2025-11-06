@@ -10,12 +10,14 @@ pub struct Config {
     pub default_file: Option<String>,
     pub print_title: Option<bool>,
     pub use_cache: Option<bool>,
+    #[serde(default)]
+    pub fortune_files: Vec<String>,
 }
 
 pub(crate) fn app_dir() -> PathBuf {
     let mut base = data_dir().unwrap_or_else(|| {
         // fallback molto conservativo
-        let mut p = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let mut p = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         p.push(".rfortune");
         p
     });
@@ -60,6 +62,7 @@ pub fn init_config_file() -> std::io::Result<()> {
         default_file: Some(get_default_path().to_string_lossy().to_string()),
         print_title: Some(true),
         use_cache: Some(true),
+        fortune_files: vec![],
     };
     let yaml = serde_yaml::to_string(&cfg).expect("Failed to serialize config");
     fs::write(path, yaml)?;
@@ -92,8 +95,19 @@ In Rust we trust.
 /// Carica la configurazione se presente
 pub fn load_config() -> Option<Config> {
     let path = get_config_path();
-    let content = fs::read_to_string(path).ok()?;
-    serde_yaml::from_str(&content).ok()
+    let content = fs::read_to_string(&path).ok()?;
+    let mut cfg: Config = serde_yaml::from_str(&content).ok()?;
+
+    // ✅ MIGRATION AUTOMATICA
+    if cfg.fortune_files.is_empty()
+        && let Some(df) = &cfg.default_file
+    {
+        cfg.fortune_files = vec![df.clone()];
+    }
+
+    let _ = cfg.save(); // ignoriamo eventuali errori non critici
+
+    Some(cfg)
 }
 
 /// Tenta di migrare una vecchia configurazione `config.yaml` a `rfortune.conf`
@@ -189,4 +203,22 @@ pub fn run_config_edit(editor_arg: Option<String>) -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+impl Config {
+    /// Salva la configurazione corrente su disco (YAML).
+    pub fn save(&self) -> Result<(), String> {
+        let path = get_config_path();
+        let parent = path.parent().unwrap();
+
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Could not create config directory: {e}"))?;
+        }
+
+        let yaml =
+            serde_yaml::to_string(&self).map_err(|e| format!("Could not serialize config: {e}"))?;
+
+        fs::write(&path, yaml).map_err(|e| format!("Could not write config file: {e}"))
+    }
 }

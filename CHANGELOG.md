@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.5] - 2025-02-07
+
+### Added
+
+- Support for **multiple fortune files** via `--file <PATH>` (repeatable).
+- New configuration key `fortune_files` (list).  
+  When populated, it takes priority over `default_file`.
+- Automatic **config migration**: if `fortune_files` is missing or empty,
+  it is initialized with the value of `default_file`.
+- Intelligent **no-repeat** mechanism:  
+  rfortune avoids showing the **same quote twice in a row** from the **same file**.
+- Unified JSON-based quote cache shared across multiple fortune files.
+
+### Changed
+
+- `files_fortune` is now deprecated and replaced by `fortune_files`.  
+  Existing configurations remain compatible via `serde(alias)`.
+
+### Removed
+
+- Deprecated single-file `print_random()` function.
+
+---
+
 ## [0.5.3] - 2025-11-05
 
 ### Fixed

@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-fn create_temp_file(content: &str, filename: &str) -> String {
+fn create_temp_file(content: &str, filename: &str) -> PathBuf {
     let mut path: PathBuf = env::temp_dir();
     path.push(filename);
 
@@ -12,7 +12,7 @@ fn create_temp_file(content: &str, filename: &str) -> String {
     file.write_all(content.as_bytes())
         .expect("Failed to write to temp file");
 
-    path.to_string_lossy().to_string()
+    path
 }
 
 #[test]
