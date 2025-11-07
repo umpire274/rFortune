@@ -30,6 +30,18 @@ scripting, or just a bit of inspiration.
 - **Unified JSON-based cache** shared across all configured fortune files.
 - Intelligent **no-repeat mechanism**: rFortune now avoids showing the same quote twice in a row from the same file.
 
+**🔒 Cache robustness improvements**
+
+- Cache writes to the shared JSON store are now atomic: data is written to a temporary file and then replaced via rename
+  to avoid partial/corrupted writes.
+- Advisory file locking (via the `fs2` crate) is used to protect concurrent access to the shared cache (
+  `last_quotes.json`). This reduces races when multiple rFortune processes run simultaneously.
+- Windows fallback: on platforms with older rename semantics the implementation attempts a remove+rename fallback to
+  ensure the store is replaced reliably.
+- Internal cleanup: introduced a small `open_and_lock()` helper to centralize file opening/locking logic and switched
+  internal cache APIs to use `anyhow` for richer error context.
+- Added an integration test (`tests/cache_tests.rs`) and the dependencies `fs2` and `anyhow`.
+
 ## 🧭 Improved cross-platform behavior
 
 - Fixed an issue with the `app_dir()` function on Linux and macOS where `dirs::data_dir()` could return `None` in CI or
