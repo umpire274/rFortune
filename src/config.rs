@@ -3,9 +3,9 @@ use dirs::data_dir;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::{env, fs};
-use std::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {

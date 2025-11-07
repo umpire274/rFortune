@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use rfortune::{config, utils};
 
 #[test]
