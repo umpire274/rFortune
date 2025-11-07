@@ -2,10 +2,13 @@ use crate::config;
 use crate::config::Config;
 use crate::loader::FortuneFile;
 use crate::log::ConsoleLog;
+use fs2::FileExt;
 use rand::seq::IndexedRandom;
 use std::collections::HashMap;
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
 /// Estrae una citazione casuale dalla lista
@@ -85,8 +88,7 @@ pub fn print_random_from_files(paths: &[&Path]) -> Result<(), String> {
 
 /// Percorso del file cache per un determinato fortune file
 pub fn get_cache_path(dat_path: &Path) -> PathBuf {
-    let mut base = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
-    base.push("rfortune");
+    let mut base = config::app_dir();
     base.push("cache");
 
     // ✅ garantisce che la directory esista sempre
@@ -161,23 +163,61 @@ pub fn clear_cache_dir() -> io::Result<()> {
     Ok(())
 }
 
-/// Salva l’ultima citazione usata in un file di cache
+/// Salva l’ultima citazione usata in un file di cache (scrittura atomica + locking)
 pub fn save_last_cache(path: &Path, quote: &str) -> Result<(), String> {
     let store = cache_store_path();
-    ensure_cache_dir(&store)?; // ✅ nuova funzione riutilizzata
+    ensure_cache_dir(&store)?;
 
-    let mut map: HashMap<String, String> = if store.exists() {
-        serde_json::from_str(&fs::read_to_string(&store).map_err(|e| format!("read cache: {e}"))?)
-            .unwrap_or_default()
-    } else {
+    // Apri (o crea) il file store e acquisisci lock esclusivo
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&store)
+        .map_err(|e| format!("open cache file: {e}"))?;
+
+    file.lock_exclusive()
+        .map_err(|e| format!("lock cache: {e}"))?;
+
+    // Leggi contenuto esistente
+    let mut existing = String::new();
+    if file.metadata().is_ok() {
+        use std::io::Read;
+        let mut r = &file;
+        r.read_to_string(&mut existing).ok();
+    }
+
+    let mut map: HashMap<String, String> = if existing.is_empty() {
         HashMap::new()
+    } else {
+        serde_json::from_str(&existing).unwrap_or_default()
     };
 
     map.insert(canonical_key(path), quote.to_string());
 
     let json = serde_json::to_string_pretty(&map).map_err(|e| format!("serialize cache: {e}"))?;
 
-    fs::write(&store, json).map_err(|e| format!("write cache: {e}"))
+    // Scrittura atomica: crea file temporaneo nella stessa directory e rinomina
+    let tmp_name = format!(
+        "{}.tmp.{}",
+        store.file_name().unwrap().to_string_lossy(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    );
+
+    let tmp_path = store.with_file_name(tmp_name);
+
+    fs::write(&tmp_path, json).map_err(|e| format!("write temp cache: {e}"))?;
+
+    fs::rename(&tmp_path, &store).map_err(|e| format!("rename cache: {e}"))?;
+
+    // Rilascia il lock (file chiude rilascia automaticamente, ma lo unlock esplicito aiuta)
+    file.unlock().map_err(|e| format!("unlock cache: {e}"))?;
+
+    Ok(())
 }
 
 pub fn ensure_app_initialized() -> io::Result<()> {
@@ -290,32 +330,23 @@ pub fn load_last_cache(path: &Path) -> Result<String, String> {
         return Err("no cache".to_string());
     }
 
-    // ✅ carica in sicurezza la cache JSON (se danneggiata → mappa vuota)
+    // Apri file in sola lettura e acquisisci lock condiviso
+    let file = OpenOptions::new()
+        .read(true)
+        .open(&store)
+        .map_err(|e| format!("open cache file: {e}"))?;
+
+    file.lock_shared().map_err(|e| format!("lock cache: {e}"))?;
+
     let data = fs::read_to_string(&store).unwrap_or_default();
     let map: HashMap<String, String> = serde_json::from_str(&data).unwrap_or_default();
 
-    map.get(&canonical_key(path))
+    let result = map
+        .get(&canonical_key(path))
         .cloned()
-        .ok_or_else(|| "no cache".to_string())
-}
+        .ok_or_else(|| "no cache".to_string());
 
-/// (Facoltativo) Versione "allineata" di save_last_cache nel caso tu voglia uniformarla
-/// al formato JSON condiviso. Se hai già una save_last_cache funzionante, puoi ignorare questa.
-#[allow(dead_code)]
-pub fn save_last_cache_json(path: &Path, quote: &str) -> Result<(), String> {
-    let store = cache_store_path();
-    ensure_cache_dir(&store)?; // ✅ nuova funzione riutilizzata
+    file.unlock().ok();
 
-    let mut map: HashMap<String, String> = if store.exists() {
-        let s = fs::read_to_string(&store).map_err(|e| format!("read cache: {e}"))?;
-        serde_json::from_str(&s).unwrap_or_default()
-    } else {
-        HashMap::new()
-    };
-
-    map.insert(canonical_key(path), quote.to_string());
-
-    let json = serde_json::to_string_pretty(&map).map_err(|e| format!("serialize cache: {e}"))?;
-
-    fs::write(&store, json).map_err(|e| format!("write cache: {e}"))
+    result
 }
