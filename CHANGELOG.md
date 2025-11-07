@@ -1,26 +1,58 @@
 # Changelog
 
-## [0.5.5] - 2025-02-07
+## [0.5.6] - 2025-11-07
 
 ### Added
 
-- Support for **multiple fortune files** via `--file <PATH>` (repeatable).
-- New configuration key `fortune_files` (list).  
-  When populated, it takes priority over `default_file`.
-- Automatic **config migration**: if `fortune_files` is missing or empty,
-  it is initialized with the value of `default_file`.
-- Intelligent **no-repeat** mechanism:  
-  rfortune avoids showing the **same quote twice in a row** from the **same file**.
-- Unified JSON-based quote cache shared across multiple fortune files.
+- Advisory file locking using the `fs2` crate to protect concurrent access to the shared JSON cache (`last_quotes.json`).
+- A dedicated integration test `tests/cache_tests.rs` to verify save/load roundtrip for the cache using a sandboxed application directory.
 
 ### Changed
 
-- `files_fortune` is now deprecated and replaced by `fortune_files`.  
-  Existing configurations remain compatible via `serde(alias)`.
+- Implemented atomic writes for the JSON cache store: writes now go to a temporary file in the same directory and are replaced via rename. On Windows the code attempts a remove+rename fallback to cover older semantics that may prevent overwrites.
+- Introduced `open_and_lock()` helper to centralize file opening and locking logic (DRY).
+- Switched internal cache APIs to use `anyhow::Result` for richer error context.
+- Unified cache path resolution to consistently use `config::app_dir()`.
+- Added `fs2` and `anyhow` dependencies in `Cargo.toml`.
+
+### Fixed
+
+- Removed unused helper `save_last_cache_json` and cleaned up duplicate cache initialization logic.
+
+---
+
+## [0.5.5] - 2025-11-06
+
+### Added
+
+- Support for **multiple fortune files** via the repeatable `--file <PATH>` option.  
+  Example:
+  ```bash
+  rfortune --file ~/fortunes/dev --file ~/fortunes/humor
+  ```
+- New configuration key `fortune_files` (list). When populated, it takes priority over default_file.
+- Automatic **configuration migration**: if `fortune_files` is missing or empty, it is initialized with the value of
+  `default_file`.
+- Unified **JSON-based quote cache** shared across multiple fortune files.
+- Intelligent **no-repeat mechanism**: prevents showing the same quote twice in a row
+  from the same fortune file.
+- Informational log message showing the active configuration directory during startup.
+
+### Changed
+
+- The function `app_dir()` now provides a consistent and reliable fallback when `dirs::data_dir()` returns `None` (e.g.
+  in
+  CI or headless environments).
+    - macOS → `$HOME/Library/Application Support/rfortune`
+    - Linux → `$HOME/.local/share/rfortune`
+- Improved cross-platform consistency for configuration and cache directories.
+- Fixed inconsistent cache path resolution caused by incorrect `app_dir()` usage on Linux/macOS.
+- Extracted duplicated cache directory creation logic into a new helper function `ensure_cache_dir()`, now used by both
+  `save_last_cache()` and `save_last_cache_json()` for more reliable cache writes.
 
 ### Removed
 
-- Deprecated single-file `print_random()` function.
+- Deprecated single-file `print_random()` function replaced by multi-file logic.
 
 ---
 

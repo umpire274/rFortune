@@ -2,10 +2,16 @@ use crate::config;
 use crate::config::Config;
 use crate::loader::FortuneFile;
 use crate::log::ConsoleLog;
+use anyhow::{Context, Result};
+use fs2::FileExt;
 use rand::seq::IndexedRandom;
 use std::collections::HashMap;
+use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::Write;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
 /// Estrae una citazione casuale dalla lista
@@ -85,8 +91,7 @@ pub fn print_random_from_files(paths: &[&Path]) -> Result<(), String> {
 
 /// Percorso del file cache per un determinato fortune file
 pub fn get_cache_path(dat_path: &Path) -> PathBuf {
-    let mut base = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
-    base.push("rfortune");
+    let mut base = config::app_dir();
     base.push("cache");
 
     // ✅ garantisce che la directory esista sempre
@@ -161,24 +166,117 @@ pub fn clear_cache_dir() -> io::Result<()> {
     Ok(())
 }
 
-/// Salva l’ultima citazione usata in un file di cache
-pub fn save_last_cache(path: &Path, quote: &str) -> Result<(), String> {
-    let store = cache_store_path();
+/// Ensure that the parent directory for the given cache store path exists.
+/// Returns an error if creation fails.
+fn ensure_cache_dir(store: &Path) -> Result<()> {
+    if let Some(parent) = store.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("create cache dir: {}", parent.display()))?;
+    }
+    Ok(())
+}
 
-    let mut map: HashMap<String, String> = if store.exists() {
-        serde_json::from_str(&fs::read_to_string(&store).map_err(|e| format!("read cache: {e}"))?)
-            .unwrap_or_default()
+/// Open the given `store` file and acquire a lock.
+/// If `exclusive` is true, open for read+write+create and acquire an exclusive lock.
+/// Otherwise, open read-only and acquire a shared lock.
+fn open_and_lock(store: &Path, exclusive: bool) -> Result<File> {
+    let file = if exclusive {
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(store)
+            .with_context(|| format!("open cache file: {}", store.display()))?
     } else {
+        OpenOptions::new()
+            .read(true)
+            .open(store)
+            .with_context(|| format!("open cache file (read): {}", store.display()))?
+    };
+
+    if exclusive {
+        file.lock_exclusive()
+            .with_context(|| format!("lock cache (exclusive): {}", store.display()))?;
+    } else {
+        file.lock_shared()
+            .with_context(|| format!("lock cache (shared): {}", store.display()))?;
+    }
+
+    Ok(file)
+}
+
+/// Salva l’ultima citazione usata in un file di cache (scrittura atomica + locking)
+pub fn save_last_cache(path: &Path, quote: &str) -> Result<()> {
+    let store = cache_store_path();
+    ensure_cache_dir(&store)?;
+
+    // Apri (o crea) il file store e acquisisci lock esclusivo
+    let mut file = open_and_lock(&store, true)?;
+
+    // Leggi contenuto esistente dal file handle per rispettare il lock
+    let mut existing = String::new();
+    file.seek(SeekFrom::Start(0))?;
+    file.read_to_string(&mut existing).ok();
+
+    let mut map: HashMap<String, String> = if existing.is_empty() {
         HashMap::new()
+    } else {
+        serde_json::from_str(&existing).unwrap_or_default()
     };
 
     map.insert(canonical_key(path), quote.to_string());
 
-    fs::write(
-        &store,
-        serde_json::to_string_pretty(&map).map_err(|e| format!("serialize cache: {e}"))?,
-    )
-    .map_err(|e| format!("write cache: {e}"))
+    let json = serde_json::to_string_pretty(&map).with_context(|| "serialize cache")?;
+
+    // Scrittura atomica: crea file temporaneo nella stessa directory e rinomina
+    let tmp_name = format!(
+        "{}.tmp.{}",
+        store
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "last_quotes.json".into()),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    );
+
+    let tmp_path = store.with_file_name(tmp_name);
+
+    fs::write(&tmp_path, &json)
+        .with_context(|| format!("write temp cache: {}", tmp_path.display()))?;
+
+    // Try rename; on Windows older semantics may prevent overwriting, try remove+rename
+    match fs::rename(&tmp_path, &store) {
+        Ok(_) => {}
+        Err(e) => {
+            if cfg!(windows) {
+                // attempt best-effort replace
+                if store.exists() {
+                    fs::remove_file(&store)
+                        .with_context(|| format!("remove existing store: {}", store.display()))?;
+                    fs::rename(&tmp_path, &store).with_context(|| {
+                        format!(
+                            "rename cache after remove: {} -> {}",
+                            tmp_path.display(),
+                            store.display()
+                        )
+                    })?;
+                } else {
+                    return Err(e).with_context(|| "rename cache failed and store did not exist");
+                }
+            } else {
+                return Err(e).with_context(|| "rename cache failed");
+            }
+        }
+    }
+
+    // Rilascia il lock
+    file.unlock()
+        .with_context(|| format!("unlock cache: {}", store.display()))?;
+
+    Ok(())
 }
 
 pub fn ensure_app_initialized() -> io::Result<()> {
@@ -250,7 +348,7 @@ pub fn resolve_fortune_sources(cli_files: Option<Vec<String>>, config: &Config) 
 }
 
 /// Percorso del file JSON di cache: ~/.local/share/rfortune/cache/last_quotes.json
-fn cache_store_path() -> std::path::PathBuf {
+fn cache_store_path() -> PathBuf {
     let mut p = config::app_dir();
     p.push("cache");
     let _ = fs::create_dir_all(&p);
@@ -267,33 +365,36 @@ fn canonical_key(path: &Path) -> String {
 
 /// Carica l'ULTIMA citazione mostrata per il file `path`.
 /// Ritorna Ok(quote) se presente, Err(...) se assente o in caso di problema non critico.
-pub fn load_last_cache(path: &Path) -> Result<String, String> {
+pub fn load_last_cache(path: &Path) -> Result<String> {
     let store = cache_store_path();
-    let data = fs::read_to_string(&store).map_err(|_| "no cache".to_string())?;
+
+    // garantisci che la directory cache esista
+    if let Some(parent) = store.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create cache directory: {}", parent.display()))?;
+    }
+
+    // se il file non esiste ancora → ritorna "nessuna cache" ma senza errore fatale
+    if !store.exists() {
+        return Err(anyhow::anyhow!("no cache"));
+    }
+
+    // Apri file in sola lettura e acquisisci lock condiviso
+    let mut file = open_and_lock(&store, false)?;
+
+    let mut data = String::new();
+    file.seek(SeekFrom::Start(0))?;
+    file.read_to_string(&mut data).ok();
+
     let map: HashMap<String, String> = serde_json::from_str(&data).unwrap_or_default();
 
-    map.get(&canonical_key(path))
+    let result = map
+        .get(&canonical_key(path))
         .cloned()
-        .ok_or_else(|| "no cache".to_string())
-}
+        .ok_or_else(|| anyhow::anyhow!("no cache"));
 
-/// (Facoltativo) Versione "allineata" di save_last_cache nel caso tu voglia uniformarla
-/// al formato JSON condiviso. Se hai già una save_last_cache funzionante, puoi ignorare questa.
-#[allow(dead_code)]
-pub fn save_last_cache_json(path: &Path, quote: &str) -> Result<(), String> {
-    let store = cache_store_path();
+    // Rilascia il lock (ignore unlock error)
+    let _ = file.unlock();
 
-    // carica mappa esistente (se c'è)
-    let mut map: HashMap<String, String> = if store.exists() {
-        let s = fs::read_to_string(&store).map_err(|e| format!("read cache: {e}"))?;
-        serde_json::from_str(&s).unwrap_or_default()
-    } else {
-        HashMap::new()
-    };
-
-    let key = canonical_key(path);
-    map.insert(key, quote.to_string());
-
-    let json = serde_json::to_string_pretty(&map).map_err(|e| format!("serialize cache: {e}"))?;
-    fs::write(&store, json).map_err(|e| format!("write cache: {e}"))
+    result
 }

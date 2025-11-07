@@ -15,20 +15,49 @@ scripting, or just a bit of inspiration.
 
 ---
 
-### ✨ New in v0.5.3
+### ✨ New in v0.5.5
 
-**🧭 Smarter first-time initialization**
+**📚 Multiple fortune file support**
 
-- Added an interactive prompt when `rfortune` is launched for the first time and no configuration directory exists.
-    - In interactive terminals, users are asked: `Initialize rFortune now? [Y/n]`.
-    - In non-interactive contexts (scripts, CI, etc.), initialization happens automatically.
-- Prevents unintended directory creation and improves transparency during first setup.
-- Initialization progress and results are displayed using `ConsoleLog` messages for consistency.
+- Added support for **multiple fortune files** via the repeatable option `--file <PATH>`.  
+  Example:
+  ```bash
+  rfortune --file ~/fortunes/dev --file ~/fortunes/humor
+  ```
+- Introduced the new configuration key `fortune_files` (list). When defined, it takes priority over `default_file`.
+- **Automatic config migration**: if `fortune_files` is missing or empty, it is initialized automatically with the
+  previous `default_file` value.
+- **Unified JSON-based cache** shared across all configured fortune files.
+- Intelligent **no-repeat mechanism**: rFortune now avoids showing the same quote twice in a row from the same file.
 
-**⚙️ Improved startup behavior**
+**🔒 Cache robustness improvements**
 
-- The application now clearly reports which configuration directory is being used (`dirs::data_dir()` path).
-- Overall initialization flow refined for clarity and better UX.
+- Cache writes to the shared JSON store are now atomic: data is written to a temporary file and then replaced via rename
+  to avoid partial/corrupted writes.
+- Advisory file locking (via the `fs2` crate) is used to protect concurrent access to the shared cache (
+  `last_quotes.json`). This reduces races when multiple rFortune processes run simultaneously.
+- Windows fallback: on platforms with older rename semantics the implementation attempts a remove+rename fallback to
+  ensure the store is replaced reliably.
+- Internal cleanup: introduced a small `open_and_lock()` helper to centralize file opening/locking logic and switched
+  internal cache APIs to use `anyhow` for richer error context.
+- Added an integration test (`tests/cache_tests.rs`) and the dependencies `fs2` and `anyhow`.
+
+## 🧭 Improved cross-platform behavior
+
+- Fixed an issue with the `app_dir()` function on Linux and macOS where `dirs::data_dir()` could return `None` in CI or
+  headless environments.
+- Added reliable fallbacks ensuring consistent paths:
+    - macOS → `$HOME/Library/Application Support/rfortune`
+    - Linux → `$HOME/.local/share/rfortune`
+- Fixed inconsistent cache path resolution caused by incorrect `app_dir()` usage on Linux/macOS.
+- Introduced the new helper function `ensure_cache_dir()` to centralize cache directory creation, improving reliability
+  across `save_last_cache()` and `save_last_cache_json()`.
+- Ensures predictable configuration and cache directory behavior across all systems, including GitHub Actions.
+
+## ⚙️ Deprecated
+
+- The old `files_fortune` key and single-file `print_random()` function have been removed or replaced by the new
+  multi-file logic.
 
 ---
 
