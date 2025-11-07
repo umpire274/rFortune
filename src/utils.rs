@@ -2,17 +2,17 @@ use crate::config;
 use crate::config::Config;
 use crate::loader::FortuneFile;
 use crate::log::ConsoleLog;
+use anyhow::{Context, Result};
 use fs2::FileExt;
 use rand::seq::IndexedRandom;
 use std::collections::HashMap;
+use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
-use anyhow::{Context, Result};
-use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
 
 /// Estrae una citazione casuale dalla lista
 pub fn random_quote(quotes: &[String]) -> &str {
@@ -170,7 +170,8 @@ pub fn clear_cache_dir() -> io::Result<()> {
 /// Returns an error if creation fails.
 fn ensure_cache_dir(store: &Path) -> Result<()> {
     if let Some(parent) = store.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("create cache dir: {}", parent.display()))?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("create cache dir: {}", parent.display()))?;
     }
     Ok(())
 }
@@ -242,7 +243,8 @@ pub fn save_last_cache(path: &Path, quote: &str) -> Result<()> {
 
     let tmp_path = store.with_file_name(tmp_name);
 
-    fs::write(&tmp_path, &json).with_context(|| format!("write temp cache: {}", tmp_path.display()))?;
+    fs::write(&tmp_path, &json)
+        .with_context(|| format!("write temp cache: {}", tmp_path.display()))?;
 
     // Try rename; on Windows older semantics may prevent overwriting, try remove+rename
     match fs::rename(&tmp_path, &store) {
@@ -253,8 +255,13 @@ pub fn save_last_cache(path: &Path, quote: &str) -> Result<()> {
                 if store.exists() {
                     fs::remove_file(&store)
                         .with_context(|| format!("remove existing store: {}", store.display()))?;
-                    fs::rename(&tmp_path, &store)
-                        .with_context(|| format!("rename cache after remove: {} -> {}", tmp_path.display(), store.display()))?;
+                    fs::rename(&tmp_path, &store).with_context(|| {
+                        format!(
+                            "rename cache after remove: {} -> {}",
+                            tmp_path.display(),
+                            store.display()
+                        )
+                    })?;
                 } else {
                     return Err(e).with_context(|| "rename cache failed and store did not exist");
                 }
@@ -265,7 +272,8 @@ pub fn save_last_cache(path: &Path, quote: &str) -> Result<()> {
     }
 
     // Rilascia il lock
-    file.unlock().with_context(|| format!("unlock cache: {}", store.display()))?;
+    file.unlock()
+        .with_context(|| format!("unlock cache: {}", store.display()))?;
 
     Ok(())
 }
@@ -361,7 +369,8 @@ pub fn load_last_cache(path: &Path) -> Result<String> {
 
     // garantisci che la directory cache esista
     if let Some(parent) = store.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("failed to create cache directory: {}", parent.display()))?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create cache directory: {}", parent.display()))?;
     }
 
     // se il file non esiste ancora → ritorna "nessuna cache" ma senza errore fatale
@@ -378,7 +387,10 @@ pub fn load_last_cache(path: &Path) -> Result<String> {
 
     let map: HashMap<String, String> = serde_json::from_str(&data).unwrap_or_default();
 
-    let result = map.get(&canonical_key(path)).cloned().ok_or_else(|| anyhow::anyhow!("no cache"));
+    let result = map
+        .get(&canonical_key(path))
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("no cache"));
 
     // Rilascia il lock (ignore unlock error)
     let _ = file.unlock();
