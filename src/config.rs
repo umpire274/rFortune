@@ -29,10 +29,10 @@ pub fn set_app_dir_for_tests(dir: PathBuf) {
 /// Durante i test, se `set_app_dir_for_tests()` è stato chiamato,
 /// allora viene utilizzata la sandbox invece della directory reale.
 pub fn app_dir() -> PathBuf {
-    if let Some(m) = APP_DIR_OVERRIDE.get() {
-        if let Some(dir) = m.lock().unwrap().clone() {
-            return dir;
-        }
+    if let Some(m) = APP_DIR_OVERRIDE.get()
+        && let Some(dir) = m.lock().unwrap().clone()
+    {
+        return dir;
     }
 
     // 1️⃣ Caso normale: dirs::data_dir() restituisce un path valido
