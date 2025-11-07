@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
 use std::{env, fs};
+use std::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -15,19 +16,23 @@ pub struct Config {
     pub fortune_files: Vec<String>,
 }
 
-static APP_DIR_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
+static APP_DIR_OVERRIDE: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
 
 /// Usata nei test per forzare una directory sandbox
 pub fn set_app_dir_for_tests(dir: PathBuf) {
-    let _ = APP_DIR_OVERRIDE.set(dir);
+    let m = APP_DIR_OVERRIDE.get_or_init(|| Mutex::new(None));
+    let mut guard = m.lock().unwrap();
+    *guard = Some(dir);
 }
 
 /// Restituisce la directory di configurazione dell'app.
 /// Durante i test, se `set_app_dir_for_tests()` è stato chiamato,
 /// allora viene utilizzata la sandbox invece della directory reale.
-pub(crate) fn app_dir() -> PathBuf {
-    if let Some(dir) = APP_DIR_OVERRIDE.get() {
-        return dir.clone();
+pub fn app_dir() -> PathBuf {
+    if let Some(m) = APP_DIR_OVERRIDE.get() {
+        if let Some(dir) = m.lock().unwrap().clone() {
+            return dir;
+        }
     }
 
     // 1️⃣ Caso normale: dirs::data_dir() restituisce un path valido

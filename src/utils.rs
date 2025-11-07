@@ -247,6 +247,10 @@ pub fn save_last_cache(path: &Path, quote: &str) -> Result<()> {
     fs::write(&tmp_path, &json)
         .with_context(|| format!("write temp cache: {}", tmp_path.display()))?;
 
+    // Release lock and close the original store file before attempting rename/remove (important on Windows)
+    file.unlock().ok();
+    drop(file);
+
     // Try rename; on Windows older semantics may prevent overwriting, try remove+rename
     match fs::rename(&tmp_path, &store) {
         Ok(_) => {}
@@ -271,10 +275,6 @@ pub fn save_last_cache(path: &Path, quote: &str) -> Result<()> {
             }
         }
     }
-
-    // Rilascia il lock
-    file.unlock()
-        .with_context(|| format!("unlock cache: {}", store.display()))?;
 
     Ok(())
 }

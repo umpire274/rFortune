@@ -1,26 +1,5 @@
 # Changelog
 
-## [0.5.6] - 2025-11-07
-
-### Added
-
-- Advisory file locking using the `fs2` crate to protect concurrent access to the shared JSON cache (`last_quotes.json`).
-- A dedicated integration test `tests/cache_tests.rs` to verify save/load roundtrip for the cache using a sandboxed application directory.
-
-### Changed
-
-- Implemented atomic writes for the JSON cache store: writes now go to a temporary file in the same directory and are replaced via rename. On Windows the code attempts a remove+rename fallback to cover older semantics that may prevent overwrites.
-- Introduced `open_and_lock()` helper to centralize file opening and locking logic (DRY).
-- Switched internal cache APIs to use `anyhow::Result` for richer error context.
-- Unified cache path resolution to consistently use `config::app_dir()`.
-- Added `fs2` and `anyhow` dependencies in `Cargo.toml`.
-
-### Fixed
-
-- Removed unused helper `save_last_cache_json` and cleaned up duplicate cache initialization logic.
-
----
-
 ## [0.5.5] - 2025-11-06
 
 ### Added
@@ -37,6 +16,10 @@
 - Intelligent **no-repeat mechanism**: prevents showing the same quote twice in a row
   from the same fortune file.
 - Informational log message showing the active configuration directory during startup.
+- Advisory file locking using the `fs2` crate to protect concurrent access to the shared JSON cache (
+  `last_quotes.json`).
+- A dedicated integration test `tests/cache_tests.rs` to verify save/load roundtrip for the cache using a sandboxed
+  application directory.
 
 ### Changed
 
@@ -49,6 +32,23 @@
 - Fixed inconsistent cache path resolution caused by incorrect `app_dir()` usage on Linux/macOS.
 - Extracted duplicated cache directory creation logic into a new helper function `ensure_cache_dir()`, now used by both
   `save_last_cache()` and `save_last_cache_json()` for more reliable cache writes.
+- Implemented atomic writes for the JSON cache store: writes now go to a temporary file in the same directory and are
+  replaced via rename. On Windows the code attempts a remove+rename fallback to cover older semantics that may prevent
+  overwrites.
+- Introduced `open_and_lock()` helper to centralize file opening and locking logic (DRY).
+- Switched internal cache APIs to use `anyhow::Result` for richer error context.
+- Unified cache path resolution to consistently use `config::app_dir()`.
+- Added `fs2` and `anyhow` dependencies in `Cargo.toml`.
+
+### Fixed
+
+- Removed unused helper `save_last_cache_json` and cleaned up duplicate cache initialization logic.
+- Ensure the cache write path releases the file lock and closes the handle before attempting rename/remove (fixes
+  Windows "file in use" errors during replacement).
+- Make `app_dir()` test override re-entrant so tests can set a sandboxed app directory per test run (replaced
+  `OnceLock<PathBuf>` with `OnceLock<Mutex<Option<PathBuf>>>`).
+- Make tests robust for parallel CI runs by using unique sandbox directories (timestamp + pid) and ensuring the fortune
+  source file exists before writing cache (fixes intermittent test failures on CI/Windows).
 
 ### Removed
 
