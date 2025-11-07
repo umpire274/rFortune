@@ -185,6 +185,7 @@ fn open_and_lock(store: &Path, exclusive: bool) -> Result<File> {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(store)
             .with_context(|| format!("open cache file: {}", store.display()))?
     } else {
