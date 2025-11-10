@@ -5,13 +5,11 @@ use crate::log::ConsoleLog;
 use anyhow::{Context, Result};
 use fs2::FileExt;
 use rand::seq::IndexedRandom;
-use std::collections::HashMap;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
 /// Estrae una citazione casuale dalla lista
@@ -206,77 +204,56 @@ fn open_and_lock(store: &Path, exclusive: bool) -> Result<File> {
     Ok(file)
 }
 
-/// Salva l’ultima citazione usata in un file di cache (scrittura atomica + locking)
+/// Salva l’ultima citazione usata in un file di cache (per-file, locking)
 pub fn save_last_cache(path: &Path, quote: &str) -> Result<()> {
-    let store = cache_store_path();
+    let store = get_cache_path(path);
+
+    // Ensure parent exists
     ensure_cache_dir(&store)?;
 
     // Apri (o crea) il file store e acquisisci lock esclusivo
     let mut file = open_and_lock(&store, true)?;
 
-    // Leggi contenuto esistente dal file handle per rispettare il lock
-    let mut existing = String::new();
+    // Truncate and write the quote atomically via the locked file handle
+    file.set_len(0)?;
     file.seek(SeekFrom::Start(0))?;
-    file.read_to_string(&mut existing).ok();
+    file.write_all(quote.as_bytes())?;
+    file.sync_all()?;
 
-    let mut map: HashMap<String, String> = if existing.is_empty() {
-        HashMap::new()
-    } else {
-        serde_json::from_str(&existing).unwrap_or_default()
-    };
-
-    map.insert(canonical_key(path), quote.to_string());
-
-    let json = serde_json::to_string_pretty(&map).with_context(|| "serialize cache")?;
-
-    // Scrittura atomica: crea file temporaneo nella stessa directory e rinomina
-    let tmp_name = format!(
-        "{}.tmp.{}",
-        store
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "last_quotes.json".into()),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0)
-    );
-
-    let tmp_path = store.with_file_name(tmp_name);
-
-    fs::write(&tmp_path, &json)
-        .with_context(|| format!("write temp cache: {}", tmp_path.display()))?;
-
-    // Try rename; on Windows older semantics may prevent overwriting, try remove+rename
-    match fs::rename(&tmp_path, &store) {
-        Ok(_) => {}
-        Err(e) => {
-            if cfg!(windows) {
-                // attempt best-effort replace
-                if store.exists() {
-                    fs::remove_file(&store)
-                        .with_context(|| format!("remove existing store: {}", store.display()))?;
-                    fs::rename(&tmp_path, &store).with_context(|| {
-                        format!(
-                            "rename cache after remove: {} -> {}",
-                            tmp_path.display(),
-                            store.display()
-                        )
-                    })?;
-                } else {
-                    return Err(e).with_context(|| "rename cache failed and store did not exist");
-                }
-            } else {
-                return Err(e).with_context(|| "rename cache failed");
-            }
-        }
-    }
-
-    // Rilascia il lock
-    file.unlock()
-        .with_context(|| format!("unlock cache: {}", store.display()))?;
+    // Release lock
+    file.unlock().ok();
+    drop(file);
 
     Ok(())
+}
+
+/// Carica l'ULTIMA citazione mostrata per il file `path` (per-file cache)
+/// Ritorna Ok(quote) se presente, Err(...) se assente o in caso di problema non critico.
+pub fn load_last_cache(path: &Path) -> Result<String> {
+    let store = get_cache_path(path);
+
+    // garantisci che la directory cache esista
+    if let Some(parent) = store.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create cache directory: {}", parent.display()))?;
+    }
+
+    // se il file non esiste ancora → ritorna "nessuna cache" ma senza errore fatale
+    if !store.exists() {
+        return Err(anyhow::anyhow!("no cache"));
+    }
+
+    // Apri file in sola lettura e acquisisci lock condiviso
+    let mut file = open_and_lock(&store, false)?;
+
+    let mut data = String::new();
+    file.seek(SeekFrom::Start(0))?;
+    file.read_to_string(&mut data).ok();
+
+    // Rilascia il lock (ignore unlock error)
+    let _ = file.unlock();
+
+    Ok(data)
 }
 
 pub fn ensure_app_initialized() -> io::Result<()> {
@@ -345,56 +322,4 @@ pub fn resolve_fortune_sources(cli_files: Option<Vec<String>>, config: &Config) 
     }
 
     vec![]
-}
-
-/// Percorso del file JSON di cache: ~/.local/share/rfortune/cache/last_quotes.json
-fn cache_store_path() -> PathBuf {
-    let mut p = config::app_dir();
-    p.push("cache");
-    let _ = fs::create_dir_all(&p);
-    p.push("last_quotes.json");
-    p
-}
-
-fn canonical_key(path: &Path) -> String {
-    path.canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf())
-        .to_string_lossy()
-        .to_string()
-}
-
-/// Carica l'ULTIMA citazione mostrata per il file `path`.
-/// Ritorna Ok(quote) se presente, Err(...) se assente o in caso di problema non critico.
-pub fn load_last_cache(path: &Path) -> Result<String> {
-    let store = cache_store_path();
-
-    // garantisci che la directory cache esista
-    if let Some(parent) = store.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("failed to create cache directory: {}", parent.display()))?;
-    }
-
-    // se il file non esiste ancora → ritorna "nessuna cache" ma senza errore fatale
-    if !store.exists() {
-        return Err(anyhow::anyhow!("no cache"));
-    }
-
-    // Apri file in sola lettura e acquisisci lock condiviso
-    let mut file = open_and_lock(&store, false)?;
-
-    let mut data = String::new();
-    file.seek(SeekFrom::Start(0))?;
-    file.read_to_string(&mut data).ok();
-
-    let map: HashMap<String, String> = serde_json::from_str(&data).unwrap_or_default();
-
-    let result = map
-        .get(&canonical_key(path))
-        .cloned()
-        .ok_or_else(|| anyhow::anyhow!("no cache"));
-
-    // Rilascia il lock (ignore unlock error)
-    let _ = file.unlock();
-
-    result
 }

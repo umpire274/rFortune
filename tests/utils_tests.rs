@@ -6,7 +6,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn setup_test_env() -> PathBuf {
-    let sandbox = std::env::temp_dir().join("rfortune_test_env_utils");
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let sandbox = std::env::temp_dir().join(format!(
+        "rfortune_test_env_utils_{}_{}",
+        std::process::id(),
+        nanos
+    ));
     fs::create_dir_all(&sandbox).unwrap();
     set_app_dir_for_tests(sandbox.clone());
     sandbox
@@ -44,7 +52,11 @@ fn test_cache_read_write() {
     let file_path = sandbox.join("test_cache_source.fort");
     let quote = "Hello Cache";
 
+    // Ensure the source file exists so canonicalization produces stable absolute path
+    fs::write(&file_path, "Sample content\n%").expect("write source file");
+
     save_last_cache(&file_path, quote).expect("failed to save cache");
+
     let loaded = load_last_cache(&file_path).expect("failed to load cache");
 
     assert_eq!(loaded, quote);
