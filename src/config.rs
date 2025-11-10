@@ -1,6 +1,9 @@
 use crate::log::ConsoleLog;
 use dirs::data_dir;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
@@ -16,23 +19,34 @@ pub struct Config {
     pub fortune_files: Vec<String>,
 }
 
-static APP_DIR_OVERRIDE: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+static APP_DIR_OVERRIDE: OnceLock<Mutex<HashMap<u64, PathBuf>>> = OnceLock::new();
+
+/// Convert current thread id into a stable u64 (works on stable Rust)
+fn thread_id_u64() -> u64 {
+    let id = std::thread::current().id();
+    let mut hasher = DefaultHasher::new();
+    id.hash(&mut hasher);
+    hasher.finish()
+}
 
 /// Usata nei test per forzare una directory sandbox
 pub fn set_app_dir_for_tests(dir: PathBuf) {
-    let m = APP_DIR_OVERRIDE.get_or_init(|| Mutex::new(None));
+    let m = APP_DIR_OVERRIDE.get_or_init(|| Mutex::new(HashMap::new()));
     let mut guard = m.lock().unwrap();
-    *guard = Some(dir);
+    let tid = thread_id_u64();
+    guard.insert(tid, dir);
 }
 
 /// Restituisce la directory di configurazione dell'app.
 /// Durante i test, se `set_app_dir_for_tests()` è stato chiamato,
 /// allora viene utilizzata la sandbox invece della directory reale.
 pub fn app_dir() -> PathBuf {
-    if let Some(m) = APP_DIR_OVERRIDE.get()
-        && let Some(dir) = m.lock().unwrap().clone()
-    {
-        return dir;
+    if let Some(m) = APP_DIR_OVERRIDE.get() {
+        let guard = m.lock().unwrap();
+        let tid = thread_id_u64();
+        if let Some(dir) = guard.get(&tid).cloned() {
+            return dir;
+        }
     }
 
     // 1️⃣ Caso normale: dirs::data_dir() restituisce un path valido
@@ -59,7 +73,7 @@ pub fn app_dir() -> PathBuf {
     }
 
     // 3️⃣ Ultimo fallback (raro): directory corrente
-    let mut p = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut p = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     p.push(".rfortune");
     p
 }
