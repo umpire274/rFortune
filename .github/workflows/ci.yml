@@ -15,19 +15,16 @@ jobs:
           # Linux Debian/Ubuntu targets (.deb enabled)
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            deb_arch: amd64
             ext: tar.gz
             deb: true
 
           - os: ubuntu-latest
             target: i686-unknown-linux-gnu
-            deb_arch: i386
             ext: tar.gz
             deb: true
 
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            deb_arch: arm64
             ext: tar.gz
             deb: true
 
@@ -77,17 +74,27 @@ jobs:
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
 
+      # Linux deps (deb + i386 build support)
       - name: Install Linux build dependencies
         if: matrix.deb == true
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-multilib
 
+      # ARM64 cross-linker fix
+      - name: Install ARM64 cross toolchain
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+
       - name: Install cargo-deb (Linux only)
         if: matrix.deb == true
         run: cargo install cargo-deb
 
-      - name: Build (with icon embedding on Windows)
+      - name: Build (cross, Windows included)
         shell: bash
         run: |
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
@@ -102,7 +109,7 @@ jobs:
           mkdir -p release_artifacts/${{ matrix.target }}
           cp target/${{ matrix.target }}/debian/*.deb release_artifacts/${{ matrix.target }}/
 
-      - name: Package binary
+      - name: Package binary (.tar.gz / .zip)
         shell: bash
         run: |
           mkdir -p release_artifacts/${{ matrix.target }}
@@ -110,7 +117,7 @@ jobs:
           mkdir -p rfortune-${{ matrix.target }}
           cp rfortune rfortune-${{ matrix.target }}/ 2>/dev/null || cp rfortune.exe rfortune-${{ matrix.target }}/
           cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rfortune-${{ matrix.target }}/
-          
+
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             powershell -Command "Compress-Archive -Path rfortune-${{ matrix.target }}\\* -DestinationPath rfortune-${VERSION}-${{ matrix.target }}.zip"
             cp rfortune-${VERSION}-${{ matrix.target }}.zip $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
@@ -190,7 +197,6 @@ jobs:
           merge-multiple: true
 
       - name: Combine into single folder
-        shell: bash
         run: |
           mkdir -p release_artifacts
           find temp_download -type f -exec cp {} release_artifacts/ \;
