@@ -23,12 +23,6 @@ jobs:
             ext: tar.gz
             deb: true
 
-          # ARM64: MUSL → static & cross-compile safe
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-            ext: tar.gz
-            deb: true
-
           # macOS targets
           - os: macos-latest
             target: x86_64-apple-darwin
