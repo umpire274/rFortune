@@ -15,15 +15,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             ext: tar.gz
+            deb: true
           - os: macos-latest
             target: x86_64-apple-darwin
             ext: tar.gz
+            deb: false
           - os: macos-latest
             target: aarch64-apple-darwin
             ext: tar.gz
+            deb: false
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: zip
+            deb: false
     
     steps:
       - name: Checkout repository
@@ -54,6 +58,10 @@ jobs:
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
 
+      - name: Install cargo-deb (Linux only)
+        if: matrix.deb == true
+        run: cargo install cargo-deb
+
       - name: Build (with icon embedding on Windows)
         shell: bash
         run: |
@@ -64,8 +72,12 @@ jobs:
             cargo build --release --target ${{ matrix.target }}
           fi
 
-      - name: Build binary
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build .deb package
+        if: matrix.deb == true
+        run: |
+          cargo deb --target ${{ matrix.target }} --no-strip
+          mkdir -p release_artifacts/${{ matrix.target }}
+          cp target/${{ matrix.target }}/debian/*.deb release_artifacts/${{ matrix.target }}/
 
       - name: Package binary
         shell: bash
@@ -99,6 +111,13 @@ jobs:
             sha256sum "$file" > "$file.sha256" || shasum -a 256 "$file" > "$file.sha256"
           fi
 
+      - name: Generate SHA256 for .deb (Linux only)
+        if: matrix.deb == true
+        run: |
+          cd release_artifacts/${{ matrix.target }}
+          deb_file=$(ls *.deb)
+          sha256sum "$deb_file" > "$deb_file.sha256"
+
       - name: Sign with GPG
         shell: bash
         run: |
@@ -109,6 +128,20 @@ jobs:
           echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
             --pinentry-mode loopback \
             --output "$file.sig" --detach-sign "$file"
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Sign .deb with GPG
+        if: matrix.deb == true
+        shell: bash
+        run: |
+          cd release_artifacts/${{ matrix.target }}
+          deb_file=$(ls *.deb)
+          echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
+          echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
+            --pinentry-mode loopback \
+            --output "$deb_file.sig" --detach-sign "$deb_file"
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -175,7 +208,8 @@ jobs:
           files: |
             release_artifacts/rfortune-*.tar.gz
             release_artifacts/rfortune-*.zip
+            release_artifacts/*.deb
             release_artifacts/rfortune-*.sig
-            release_artifacts/rfortune-*.sha256
+            release_artifacts/*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

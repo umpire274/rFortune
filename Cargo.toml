@@ -34,3 +34,19 @@ atty = "0.2.14"
 serde_json = "1.0.145"
 fs2 = "0.4"
 anyhow = "1.0.100"
+
+[package.metadata.deb]
+maintainer = "Alessandro Maestri <umpire274@gmail.com>"
+depends = "libc6 (>= 2.29)"
+section = "utils"
+priority = "optional"
+assets = [
+    ["target/**/release/rfortune", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/rfortune/", "644"],
+    ["LICENSE", "usr/share/licenses/rfortune/", "644"],
+]
+license-file = ["LICENSE", "0"]
+extended-description = """
+rFortune is a modern re-implementation of the classic 'fortune' program,
+written in Rust, fully cross-platform, and supporting multiple fortune files.
+"""

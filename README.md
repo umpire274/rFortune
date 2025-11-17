@@ -15,49 +15,23 @@ scripting, or just a bit of inspiration.
 
 ---
 
-### ✨ New in v0.5.5
+### ✨ New in v0.5.6
 
-**📚 Multiple fortune file support**
+**📦 Official Debian package support**
 
-- Added support for **multiple fortune files** via the repeatable option `--file <PATH>`.  
-  Example:
-  ```bash
-  rfortune --file ~/fortunes/dev --file ~/fortunes/humor
-  ```
-- Introduced the new configuration key `fortune_files` (list). When defined, it takes priority over `default_file`.
-- **Automatic config migration**: if `fortune_files` is missing or empty, it is initialized automatically with the
-  previous `default_file` value.
-- **Unified JSON-based cache** shared across all configured fortune files.
-- Intelligent **no-repeat mechanism**: rFortune now avoids showing the same quote twice in a row from the same file.
+rFortune now ships with an official `.deb` **package** for Debian/Ubuntu-based Linux distributions.
+The `.deb` is automatically built, signed, and included in every GitHub Release.
 
-**🔒 Cache robustness improvements**
+- Fully integrated into the CI workflow
+- Includes GPG signature and SHA256 checksum
+- Addresses **Issue #79**
+- Enables easy installation via `dpkg -i`
 
-- Cache writes to the shared JSON store are now atomic: data is written to a temporary file and then replaced via rename
-  to avoid partial/corrupted writes.
-- Advisory file locking (via the `fs2` crate) is used to protect concurrent access to the shared cache (
-  `last_quotes.json`). This reduces races when multiple rFortune processes run simultaneously.
-- Windows fallback: on platforms with older rename semantics the implementation attempts a remove+rename fallback to
-  ensure the store is replaced reliably.
-- Internal cleanup: introduced a small `open_and_lock()` helper to centralize file opening/locking logic and switched
-  internal cache APIs to use `anyhow` for richer error context.
-- Added an integration test (`tests/cache_tests.rs`) and the dependencies `fs2` and `anyhow`.
+**⚙️ Improved Release Artifacts**
 
-## 🧭 Improved cross-platform behavior
-
-- Fixed an issue with the `app_dir()` function on Linux and macOS where `dirs::data_dir()` could return `None` in CI or
-  headless environments.
-- Added reliable fallbacks ensuring consistent paths:
-    - macOS → `$HOME/Library/Application Support/rfortune`
-    - Linux → `$HOME/.local/share/rfortune`
-- Fixed inconsistent cache path resolution caused by incorrect `app_dir()` usage on Linux/macOS.
-- Introduced the new helper function `ensure_cache_dir()` to centralize cache directory creation, improving reliability
-  across `save_last_cache()` and `save_last_cache_json()`.
-- Ensures predictable configuration and cache directory behavior across all systems, including GitHub Actions.
-
-## ⚙️ Deprecated
-
-- The old `files_fortune` key and single-file `print_random()` function have been removed or replaced by the new
-  multi-file logic.
+- Unified handling of Linux, macOS, and Windows builds
+- Improved consistency for SHA256 checksums and signature generation
+- Better Linux distribution support (Debian/Ubuntu + generic tarball)
 
 ---
 
@@ -103,6 +77,59 @@ brew install rfortune
 ```bash
 cargo install rfortune
 ```
+
+### 🐧📦 Linux (Debian / Ubuntu)
+
+Starting from **v0.5.6**, rFortune provides an official **`.deb` package**.
+
+You can install it directly from the GitHub Releases page:
+
+```bash
+sudo dpkg -i rfortune_<version>_amd64.deb
+```
+
+To verify integrity, download the corresponding `.sig` file and verify it with GPG (see below).
+
+```bash
+sha256sum -c rfortune_<version>_amd64.deb.sha256
+gpg --verify rfortune_<version>_amd64.deb.sig
+```
+
+If dependencies are missing, complete the installation with:
+
+```bash
+sudo apt --fix-broken install
+```
+
+### 🐧🔧 Other Linux distros
+
+You can still use the prebuilt tarball:
+
+```bash
+tar -xvf rfortune-<version>-x86_64-unknown-linux-gnu.tar.gz
+sudo mv rfortune /usr/local/bin/
+```
+
+### 🍎 macOS
+
+You can use the prebuilt tarballs for Intel or Apple Silicon:
+
+```bash
+tar -xvf rfortune-<version>-x86_64-apple-darwin.tar.gz
+sudo mv rfortune /usr/local/bin/
+```
+
+or
+
+```bash
+tar -xvf rfortune-<version>-aarch64-apple-darwin.tar.gz
+sudo mv rfortune /usr/local/bin/
+```
+
+### 🪟 Windows
+
+Download the prebuilt zip file, extract it, and move `rfortune.exe` to a directory in your `PATH`, e.g.,
+`C:\Windows\System32\` or create a dedicated folder like `C:\Program Files\rfortune\` and add it to your system `PATH`.
 
 ---
 
