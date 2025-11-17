@@ -23,8 +23,9 @@ jobs:
             ext: tar.gz
             deb: true
 
+          # ARM64: MUSL → static & cross-compile safe
           - os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
+            target: aarch64-unknown-linux-musl
             ext: tar.gz
             deb: true
 
@@ -74,27 +75,15 @@ jobs:
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
 
-      # Linux deps (deb + i386 build support)
-      - name: Install Linux build dependencies
-        if: matrix.deb == true
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-multilib
-
-      # ARM64 cross-linker fix
-      - name: Install ARM64 cross toolchain
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+      - name: Install Linux build deps (i386 support)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y gcc-multilib
 
       - name: Install cargo-deb (Linux only)
         if: matrix.deb == true
         run: cargo install cargo-deb
 
-      - name: Build (cross, Windows included)
+      - name: Build (all platforms, cross included)
         shell: bash
         run: |
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
