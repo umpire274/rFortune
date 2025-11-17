@@ -209,7 +209,7 @@ jobs:
             release_artifacts/rfortune-*.tar.gz
             release_artifacts/rfortune-*.zip
             release_artifacts/*.deb
-            release_artifacts/rfortune-*.sig
+            release_artifacts/*.sig
             release_artifacts/*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
