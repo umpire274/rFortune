@@ -98,7 +98,7 @@ jobs:
       - name: Build .deb package
         if: matrix.deb == true
         run: |
-          cargo deb --target ${{ matrix.target }} --deb-arch ${{ matrix.deb_arch }} --no-strip
+          cargo deb --target ${{ matrix.target }} --no-strip -- --deb-arch ${{ matrix.deb_arch }}
           mkdir -p release_artifacts/${{ matrix.target }}
           cp target/${{ matrix.target }}/debian/*.deb release_artifacts/${{ matrix.target }}/
 
